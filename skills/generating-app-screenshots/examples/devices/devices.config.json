@@ -1,0 +1,291 @@
+{
+  "app": {
+    "name": "Streakly"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\" canvas"
+    },
+    {
+      "id": "tablet",
+      "w": 1600,
+      "h": 2560,
+      "model": "android-tablet",
+      "store": "play",
+      "label": "Android tablet canvas"
+    },
+    "mac",
+    "windows",
+    "watch-ultra",
+    "wear-os"
+  ],
+  "output": "out",
+  "format": "png",
+  "theme": {
+    "preset": "aurora",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "slides": [
+    {
+      "id": "notch",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "text-top",
+      "preset": "midnight",
+      "eyebrow": "iPhone with notch",
+      "title": "Check off your day in **one tap**",
+      "screen": "../gallery/screens/home.html",
+      "device": {
+        "model": "iphone-notch",
+        "color": "midnight"
+      }
+    },
+    {
+      "id": "android",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "text-top",
+      "preset": "forest",
+      "eyebrow": "Android · rounded",
+      "title": "See your **progress** grow",
+      "screen": "../gallery/screens/stats.html",
+      "device": {
+        "model": "android",
+        "color": "obsidian"
+      }
+    },
+    {
+      "id": "android-flat",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "tilt-left",
+      "preset": "mint",
+      "eyebrow": "Android · flat",
+      "title": "Reminders that **feel kind**",
+      "screen": "../gallery/screens/remind.html",
+      "device": {
+        "model": "android-flat",
+        "color": "porcelain"
+      }
+    },
+    {
+      "id": "phone-watch",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "phone-watch",
+      "preset": "aurora",
+      "title": "Now **on your wrist**",
+      "subtitle": "Log habits from Apple Watch.",
+      "screen": "../gallery/screens/home.html",
+      "screen2": "screens/watch.html",
+      "watch": {
+        "color": "natural-titanium",
+        "band": "#f97316"
+      }
+    },
+    {
+      "id": "phone-wear",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "phone-watch",
+      "preset": "ocean",
+      "watchModel": "wear-os",
+      "phoneModel": "android",
+      "title": "Works with **Wear OS**",
+      "subtitle": "Your streak, one glance away.",
+      "screen": "../gallery/screens/home.html",
+      "screen2": "screens/watch-round.html",
+      "device": {
+        "color": "obsidian"
+      },
+      "watch": {
+        "color": "#2b2d33",
+        "band": "#3f6b5e"
+      }
+    },
+    {
+      "id": "watch-hero",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "watch-hero",
+      "preset": "sunset",
+      "title": "Your streak, **at a glance**",
+      "screen": "screens/watch.html",
+      "device": {
+        "color": "#222226",
+        "band": "#e8dccb"
+      }
+    },
+    {
+      "id": "wear-hero",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "watch-hero",
+      "preset": "candy",
+      "watchModel": "wear-os",
+      "title": "Round and **ready**",
+      "screen": "screens/watch-round.html",
+      "device": {
+        "color": "#d9d4cc",
+        "band": "#a78bfa"
+      }
+    },
+    {
+      "id": "laptop-phone",
+      "targets": [
+        "iphone"
+      ],
+      "layout": "laptop-phone",
+      "preset": "lilac",
+      "title": "Phone, Mac, **everywhere**",
+      "subtitle": "Your habits sync in real time.",
+      "screen": "../gallery/screens/home.html",
+      "screen2": "screens/desktop.html?state=full",
+      "device2": {
+        "color": "silver"
+      }
+    },
+    {
+      "id": "android-tablet",
+      "targets": [
+        "tablet"
+      ],
+      "layout": "text-top",
+      "preset": "citrus",
+      "eyebrow": "Android tablet",
+      "title": "Plan your week on the **big screen**",
+      "screen": "screens/desktop.html?theme=light",
+      "device": {
+        "color": "#2b2d33"
+      }
+    },
+    {
+      "id": "macbook",
+      "targets": [
+        "mac"
+      ],
+      "layout": "text-top",
+      "preset": "aurora",
+      "title": "Streakly for **Mac**",
+      "subtitle": "All your habits in one calm window.",
+      "screen": "screens/desktop.html?state=full",
+      "device": {
+        "color": "silver"
+      }
+    },
+    {
+      "id": "mac-window",
+      "targets": [
+        "mac"
+      ],
+      "layout": "hero",
+      "preset": "sunset",
+      "title": "A real **Mac app**, not a web page",
+      "screen": "screens/desktop.html",
+      "device": {
+        "model": "mac-window",
+        "title": "Streakly",
+        "chrome": "dark"
+      }
+    },
+    {
+      "id": "browser",
+      "targets": [
+        "mac"
+      ],
+      "layout": "text-left",
+      "preset": "mint",
+      "title": "Or open it in **any browser**",
+      "subtitle": "app.streakly.com — nothing to install.",
+      "screen": "screens/desktop.html?theme=light",
+      "device": {
+        "model": "browser",
+        "url": "app.streakly.com"
+      }
+    },
+    {
+      "id": "monitor",
+      "targets": [
+        "mac"
+      ],
+      "layout": "device-hero",
+      "preset": "midnight",
+      "title": "Room to **plan big**",
+      "screen": "screens/desktop.html?state=full",
+      "device": {
+        "model": "desktop",
+        "color": "silver"
+      }
+    },
+    {
+      "id": "windows",
+      "targets": [
+        "windows"
+      ],
+      "layout": "text-top",
+      "preset": "ocean",
+      "title": "Streakly for **Windows**",
+      "subtitle": "Native, fast, and in sync.",
+      "screen": "screens/desktop.html",
+      "device": {
+        "title": "Streakly",
+        "icon": "🔥",
+        "chrome": "dark"
+      }
+    },
+    {
+      "id": "windows-light",
+      "targets": [
+        "windows"
+      ],
+      "layout": "text-right",
+      "preset": "paper",
+      "title": "Light mode, **done right**",
+      "subtitle": "Follows your Windows theme.",
+      "screen": "screens/desktop.html?theme=light",
+      "device": {
+        "title": "Streakly",
+        "icon": "🔥",
+        "chrome": "light"
+      }
+    },
+    {
+      "id": "watch-store",
+      "targets": [
+        "watch"
+      ],
+      "screen": "screens/watch.html",
+      "byTarget": {
+        "wear-os": {
+          "screen": "screens/watch-round.html"
+        }
+      }
+    }
+  ]
+}

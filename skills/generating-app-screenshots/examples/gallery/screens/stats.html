@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="app.css">
+<body data-tab="Stats"><main class="page" id="p"></main><script src="app.js"></script><script>
+const before = STATE === 'before';
+const bars = before ? [22,10,35,0,18,8,12] : [62,78,70,92,85,100,74];
+const heat = Array.from({length:35},(_,i)=> before ? (i%6===0?1:i%9===0?2:0) : [2,3,4,3,2,4,3,4,4,3,2,3,4,4,3,4,2,3,4,4,4,3,4,3,2,4,4,3,4,4,4,3,4,4,4][i]);
+document.getElementById('p').innerHTML = `
+<div class="hdr"><div><div class="d">${before?'Week 1':'Week 12'}</div><h1>Insights</h1></div><div class="avatar">📈</div></div>
+<div class="grid2 full"><div class="card mini"><b style="color:${before?'#8d91a8':'#fbbf24'}">${before?'2':'47'}</b><span>Current streak</span></div>
+<div class="card mini"><b style="color:${before?'#8d91a8':'#34d399'}">${before?'21%':'94%'}</b><span>Completion</span></div></div>
+<div class="card"><div class="h2">Daily completion <span>${before?'avg 15%':'avg 80%'}</span></div><div class="bars">${bars.map((v,i)=>`<i class="${!before&&i===5?'hi':''}" style="height:${Math.max(v,4)}%"></i>`).join('')}</div>
+<div class="week" style="margin-top:8px"><i>M</i><i>T</i><i>W</i><i>T</i><i>F</i><i>S</i><i>S</i></div></div>
+<div class="card"><div class="h2">Consistency <span>last 5 weeks</span></div><div class="heat">${heat.map(l=>`<i class="l${l}"></i>`).join('')}</div></div>
+<div class="card full"><div class="h2">Mood trend <span>${before?'—':'↑ 18%'}</span></div>
+<svg class="line" width="100%" viewBox="0 0 360 110" preserveAspectRatio="none"><defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".45"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs>
+${before?'<path d="M0 80 C60 85 90 70 130 82 S220 74 260 86 330 78 360 84" stroke="#5b5f78" stroke-width="3" fill="none"/>':'<path d="M0 95 C50 90 80 70 120 72 S200 40 240 44 320 12 360 8 V110 H0Z" fill="url(#a)"/><path d="M0 95 C50 90 80 70 120 72 S200 40 240 44 320 12 360 8" stroke="#a78bfa" stroke-width="3.5" fill="none"/>'}</svg></div>
+<div class="card full"><div class="h2">Top habits</div>
+<div class="habit"><div class="ic" style="background:#163d2f">🏃</div><div class="t"><b>Morning run</b><span>${before?'1 of 7 days':'7 of 7 days'}</span></div><b style="color:${before?'#8d91a8':'#34d399'}">${before?'14%':'100%'}</b></div>
+<div class="habit"><div class="ic" style="background:#1e3a5f">💧</div><div class="t"><b>Drink water</b><span>${before?'2 of 7 days':'6 of 7 days'}</span></div><b style="color:${before?'#8d91a8':'#34d399'}">${before?'28%':'86%'}</b></div></div>`;
+</script></body>

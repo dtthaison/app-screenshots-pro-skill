@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<!-- Desktop app mock (1280x800 window content, or 1440x900 full screen). ?state=full adds a menu bar for laptop/monitor frames. ?theme=light -->
+<style>
+:root{--bg:#0c0d13;--side:#11131b;--card:#171923;--line:rgba(255,255,255,.07);--text:#f5f6fa;--muted:#8d91a8;--violet:#8b5cf6;--pink:#f472b6}
+.light{--bg:#f6f6fa;--side:#ececf3;--card:#fff;--line:rgba(0,0,0,.07);--text:#16161d;--muted:#6b6f85}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:-apple-system,"SF Pro Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column}
+.menubar{height:26px;flex:none;display:none;align-items:center;gap:18px;padding:0 14px;font-size:13px;font-weight:500;background:rgba(30,30,40,.92);color:#eee}.menubar b{font-weight:700}.menubar .r{margin-left:auto;display:flex;gap:14px}
+.full .menubar{display:flex}
+.app{flex:1;display:flex;min-height:0}
+aside{width:232px;flex:none;background:var(--side);border-right:1px solid var(--line);padding:22px 14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;margin:0 8px 22px}.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#8b5cf6,#f472b6);display:grid;place-items:center;font-size:16px}
+.nav{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:9px;font-size:14px;font-weight:600;color:var(--muted);margin-bottom:2px}.nav.on{background:rgba(139,92,246,.16);color:var(--text)}
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 10px 8px;font-weight:700}
+main{flex:1;padding:26px 30px;display:grid;grid-template-columns:1.25fr 1fr;grid-auto-rows:min-content;gap:18px;overflow:hidden}
+.hdr{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-end}.hdr h1{font-size:30px;font-weight:800;letter-spacing:-.6px}.hdr .d{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.btn{background:var(--violet);color:#fff;padding:9px 16px;border-radius:10px;font-weight:700;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+.h2{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between}.h2 span{color:var(--muted)}
+.ringrow{display:flex;gap:22px;align-items:center}.kpis{flex:1;display:grid;gap:10px}.kpi{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}.kpi b{color:var(--text)}
+.streak{background:linear-gradient(120deg,#3b1d6e,#5b2152);border:0;display:flex;gap:16px;align-items:center;color:#fff}.streak .n{font-size:36px;font-weight:800;color:#fdba74;letter-spacing:-1px}
+.habit{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid var(--line)}.habit:first-of-type{border:0}.ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:18px}
+.habit .t{flex:1}.habit b{display:block;font-size:14px}.habit span{font-size:12px;color:var(--muted)}
+.chk{width:24px;height:24px;border-radius:50%;border:2px solid #393d52}.chk.on{background:var(--violet);border-color:var(--violet)}
+.bars{display:flex;align-items:flex-end;gap:10px;height:150px}.bars i{flex:1;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,#a78bfa,#7c3aed)}.bars i.hi{background:linear-gradient(180deg,#fdba74,#f59e0b)}
+.days{display:flex;gap:10px;margin-top:6px}.days span{flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.heat{display:grid;grid-template-columns:repeat(14,1fr);gap:5px}.heat i{aspect-ratio:1;border-radius:4px;background:#2a2346}
+@media (max-width:900px){aside{display:none}main{padding:22px}}
+</style>
+<body><div class="menubar"><b>Streakly</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span><div class="r"><span>🔋 92%</span><span>Tue 29 Oct 10:09</span></div></div>
+<div class="app"><aside><div class="brand"><div class="logo">🔥</div>Streakly</div>
+<div class="nav on">🏠 Today</div><div class="nav">📊 Insights</div><div class="nav">⏰ Reminders</div><div class="nav">🏆 Badges</div><div class="nav">🎧 Focus</div>
+<div class="sec">Habits</div><div class="nav">💧 Drink water</div><div class="nav">📚 Read 20 pages</div><div class="nav">🏃 Morning run</div><div class="nav">🧘 Meditate</div></aside>
+<main><div class="hdr"><div><div class="d">Tuesday, Oct 29</div><h1>Good morning, Alex</h1></div><div class="btn">+ New habit</div></div>
+<div class="card"><div class="h2">Today <span>5 of 7</span></div><div class="ringrow"><svg width="120" height="120" viewBox="0 0 120 120" style="transform:rotate(-90deg)"><circle cx="60" cy="60" r="50" fill="none" stroke="#262338" stroke-width="13"/><circle cx="60" cy="60" r="50" fill="none" stroke="url(#g)" stroke-width="13" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="88"/><defs><linearGradient id="g"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs></svg>
+<div class="kpis"><div class="kpi">Completed <b>72%</b></div><div class="kpi">Focus time <b>1h 40m</b></div><div class="kpi">Water <b>1.6 L</b></div><div class="kpi">Steps <b>8,204</b></div></div></div></div>
+<div class="card streak"><span style="font-size:42px">🔥</span><div><div class="n">47 days</div><div style="font-size:13px;font-weight:600;color:#e9d5ff">Longest streak yet — keep going!</div></div></div>
+<div class="card"><div class="h2">Habits <span>5/7</span></div>
+<div class="habit"><div class="ic" style="background:#1e3a5f">💧</div><div class="t"><b>Drink water</b><span>8 glasses · 6 done</span></div><div class="chk on"></div></div>
+<div class="habit"><div class="ic" style="background:#4a2b1d">📚</div><div class="t"><b>Read 20 pages</b><span>Atomic Habits · p. 142</span></div><div class="chk on"></div></div>
+<div class="habit"><div class="ic" style="background:#163d2f">🏃</div><div class="t"><b>Morning run</b><span>5.2 km · 28 min</span></div><div class="chk on"></div></div>
+<div class="habit"><div class="ic" style="background:#3a2352">🧘</div><div class="t"><b>Meditate</b><span>10 min · evening</span></div><div class="chk"></div></div></div>
+<div class="card"><div class="h2">This week <span>avg 80%</span></div><div class="bars"><i style="height:62%"></i><i style="height:78%"></i><i style="height:70%"></i><i style="height:88%"></i><i style="height:74%"></i><i class="hi" style="height:100%"></i><i style="height:66%"></i></div>
+<div class="days"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+<div class="h2" style="margin-top:16px">Consistency <span>last 2 weeks</span></div><div class="heat" id="heat"></div></div>
+</main></div>
+<script>
+const q=new URLSearchParams(location.search);if(q.get('state')==='full')document.body.classList.add('full');if(q.get('theme')==='light')document.body.classList.add('light');
+const h=document.getElementById('heat');const v=[.9,.6,1,.8,.3,.95,.7,1,.85,.5,.9,1,.75,.95,.6,.9,1,.4,.8,.9,1,.7,.85,1,.9,.65,1,.8];v.forEach(x=>{const i=document.createElement('i');i.style.background=`rgba(167,139,250,${.15+x*.8})`;h.appendChild(i)});
+</script>

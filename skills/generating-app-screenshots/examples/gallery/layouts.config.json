@@ -1,0 +1,453 @@
+{
+  "app": {
+    "name": "Layout gallery — every layout × preset"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\" canvas"
+    },
+    {
+      "id": "ipad",
+      "w": 2064,
+      "h": 2752,
+      "model": "ipad",
+      "label": "iPad 13\" canvas"
+    },
+    {
+      "id": "wide",
+      "w": 2048,
+      "h": 1000,
+      "model": "iphone",
+      "label": "Wide canvas (feature graphic / landscape)"
+    }
+  ],
+  "output": "out",
+  "theme": {
+    "preset": "aurora",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "slides": [
+    {
+      "id": "hero",
+      "layout": "hero",
+      "preset": "aurora",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "subtitle": "Tiny daily wins, one streak at a time.",
+      "screen": "screens/home.html",
+      "skipTargets": [
+        "wide"
+      ],
+      "elements": [
+        {
+          "type": "badge",
+          "text": "⭐ 4.9 · 20K ratings",
+          "x": 50,
+          "y": 37.2,
+          "size": 2.9,
+          "background": "rgba(255,255,255,.95)",
+          "color": "#1b1440",
+          "byTarget": {
+            "ipad": {
+              "y": 31.5,
+              "size": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "text-top",
+      "layout": "text-top",
+      "preset": "midnight",
+      "title": "Check off your day in **one tap**",
+      "subtitle": "All your habits in one calm list.",
+      "screen": "screens/home.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "text-bottom",
+      "layout": "text-bottom",
+      "preset": "sunset",
+      "title": "Gentle **reminders**, right on time",
+      "subtitle": "Smart nudges that respect quiet hours.",
+      "screen": "screens/remind.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "device-hero",
+      "layout": "device-hero",
+      "preset": "ocean",
+      "title": "Your week **at a glance**",
+      "screen": "screens/stats.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "screen-hero",
+      "layout": "screen-hero",
+      "preset": "forest",
+      "title": "Stay in the **zone**",
+      "subtitle": "Focus timer with rain sounds.",
+      "screen": "screens/focus.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "tilt-left",
+      "layout": "tilt-left",
+      "preset": "candy",
+      "title": "See your **progress** grow",
+      "screen": "screens/stats.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "tilt-right",
+      "layout": "tilt-right",
+      "preset": "mint",
+      "title": "Celebrate every **milestone**",
+      "screen": "screens/profile.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "corner",
+      "layout": "corner",
+      "preset": "citrus",
+      "title": "Start your day in **seconds**",
+      "subtitle": "Open, tap, done.",
+      "screen": "screens/home.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "two-devices",
+      "layout": "two-devices",
+      "preset": "lilac",
+      "title": "Plan it. **Track it.**",
+      "screen": "screens/home.html",
+      "screen2": "screens/stats.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "three-devices",
+      "layout": "three-devices",
+      "preset": "aurora",
+      "title": "Everything in **one place**",
+      "screen": "screens/home.html",
+      "screen2": "screens/stats.html",
+      "screen3": "screens/profile.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "phone-tablet",
+      "layout": "phone-tablet",
+      "preset": "paper",
+      "title": "On **iPhone and iPad**",
+      "subtitle": "Synced instantly, works offline.",
+      "screen": "screens/home.html",
+      "screen2": "screens/stats.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "landscape",
+      "layout": "landscape",
+      "preset": "mono",
+      "title": "Deep focus, **full screen**",
+      "subtitle": "Turn your phone sideways for focus mode.",
+      "screen": "screens/focus.html",
+      "screen2": "screens/home.html"
+    },
+    {
+      "id": "pop-out",
+      "layout": "pop-out",
+      "preset": "midnight",
+      "title": "Details that **matter**",
+      "screen": "screens/stats.html",
+      "popouts": [
+        {
+          "crop": [
+            3,
+            12.5,
+            94,
+            12
+          ]
+        },
+        {
+          "crop": [
+            3,
+            59,
+            94,
+            22
+          ]
+        }
+      ],
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "metric",
+      "layout": "metric",
+      "preset": "sunset",
+      "title": "Your best streak **ever**",
+      "screen": "screens/home.html",
+      "metric": {
+        "icon": "🔥",
+        "value": "47 days",
+        "label": "Longest streak yet",
+        "color": "#f97316"
+      },
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "annotated",
+      "layout": "annotated",
+      "preset": "ocean",
+      "title": "Built for **real routines**",
+      "screen": "screens/home.html",
+      "skipTargets": [
+        "wide"
+      ],
+      "callouts": [
+        {
+          "text": "Daily progress ring",
+          "at": [
+            22,
+            15
+          ]
+        },
+        {
+          "text": "Streak counter",
+          "at": [
+            72,
+            27
+          ]
+        },
+        {
+          "text": "One-tap check-off",
+          "at": [
+            90,
+            39
+          ]
+        }
+      ]
+    },
+    {
+      "id": "before-after",
+      "layout": "before-after",
+      "preset": "coral",
+      "title": "From **chaos** to consistency",
+      "screen": "screens/stats.html?state=before",
+      "screen2": "screens/stats.html?state=after",
+      "labels": [
+        "Week 1",
+        "Week 12"
+      ],
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "frameless",
+      "layout": "frameless",
+      "preset": "lilac",
+      "title": "Clean and **distraction-free**",
+      "screen": "screens/home.html"
+    },
+    {
+      "id": "mosaic",
+      "layout": "mosaic",
+      "preset": "candy",
+      "title": "Made for **every goal**",
+      "screens": [
+        "screens/home.html",
+        "screens/stats.html",
+        "screens/profile.html",
+        "screens/remind.html"
+      ]
+    },
+    {
+      "id": "feature-grid",
+      "layout": "feature-grid",
+      "preset": "aurora",
+      "title": "Packed with **power**",
+      "features": [
+        {
+          "icon": "🔥",
+          "title": "Streaks",
+          "text": "Never break the chain"
+        },
+        {
+          "icon": "⏰",
+          "title": "Smart reminders",
+          "text": "At the right moment"
+        },
+        {
+          "icon": "📊",
+          "title": "Insights",
+          "text": "Trends and heatmaps"
+        },
+        {
+          "icon": "🏆",
+          "title": "Achievements",
+          "text": "40+ badges to earn"
+        },
+        {
+          "icon": "☁️",
+          "title": "iCloud sync",
+          "text": "All your devices"
+        },
+        {
+          "icon": "🔒",
+          "title": "Private",
+          "text": "No account needed"
+        }
+      ]
+    },
+    {
+      "id": "steps",
+      "layout": "steps",
+      "preset": "paper",
+      "title": "Start in **3 steps**",
+      "steps": [
+        {
+          "title": "Pick your habits",
+          "text": "Choose from 60 templates or create your own."
+        },
+        {
+          "title": "Set gentle reminders",
+          "text": "We nudge you at the best time."
+        },
+        {
+          "title": "Check in daily",
+          "text": "One tap — watch your streak grow."
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "layout": "stats",
+      "preset": "midnight",
+      "eyebrow": "Real results",
+      "title": "Numbers that **speak**",
+      "screen": "screens/stats.html",
+      "stats": [
+        {
+          "value": "2M+",
+          "label": "habits completed"
+        },
+        {
+          "value": "94%",
+          "label": "keep their streak 30+ days"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "layout": "review",
+      "preset": "forest",
+      "title": "Loved by **20,000+** people",
+      "screen": "screens/home.html",
+      "review": {
+        "stars": 5,
+        "quote": "The first habit app I've stuck with for more than a week. Simple and beautiful.",
+        "author": "— Jamie R., App Store review"
+      }
+    },
+    {
+      "id": "awards",
+      "layout": "awards",
+      "preset": "mono",
+      "title": "Award-**winning** design",
+      "screen": "screens/profile.html",
+      "awards": [
+        {
+          "title": "App of the Day",
+          "subtitle": "Sample award"
+        },
+        {
+          "title": "Editors' Choice",
+          "subtitle": "Sample award"
+        }
+      ]
+    },
+    {
+      "id": "split-photo",
+      "layout": "split-photo",
+      "preset": "sunset",
+      "title": "Fits your **morning**",
+      "photo": "photo-morning.jpg",
+      "screen": "screens/home.html",
+      "skipTargets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "caption-only",
+      "layout": "caption-only",
+      "preset": "candy",
+      "title": "Small steps.\n**Big changes.**"
+    },
+    {
+      "id": "text-left",
+      "layout": "text-left",
+      "preset": "aurora",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "subtitle": "Tiny daily wins, one streak at a time.",
+      "screen": "screens/home.html",
+      "targets": [
+        "wide"
+      ]
+    },
+    {
+      "id": "text-right",
+      "layout": "text-right",
+      "preset": "sunset",
+      "title": "Gentle **reminders**, right on time",
+      "subtitle": "Smart nudges that respect quiet hours.",
+      "screen": "screens/remind.html",
+      "targets": [
+        "wide"
+      ]
+    }
+  ]
+}

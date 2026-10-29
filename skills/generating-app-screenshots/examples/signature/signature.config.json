@@ -1,0 +1,202 @@
+{
+  "app": {
+    "name": "Signature layouts"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\""
+    },
+    {
+      "id": "ipad",
+      "w": 2064,
+      "h": 2752,
+      "model": "ipad",
+      "label": "iPad 13\""
+    }
+  ],
+  "output": "out",
+  "theme": {
+    "preset": "aurora",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800,
+        900
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "slides": [
+    {
+      "id": "spotlight",
+      "layout": "spotlight",
+      "preset": "mono",
+      "eyebrow": "Habit tracker",
+      "title": "Your day, **in the spotlight**",
+      "subtitle": "Every habit in one calm list.",
+      "screen": "../gallery/screens/home.html",
+      "background": {
+        "gradient": {
+          "type": "radial",
+          "at": "50% 0%",
+          "stops": [
+            "#2a2a33",
+            "#09090b 70%"
+          ]
+        },
+        "noise": 0.06
+      }
+    },
+    {
+      "id": "big-type",
+      "layout": "big-type",
+      "preset": "aurora",
+      "title": "Make it **stick**",
+      "screen": "../gallery/screens/home.html"
+    },
+    {
+      "id": "ticker",
+      "layout": "ticker",
+      "preset": "coral",
+      "title": "Never **break** the chain",
+      "subtitle": "47 days and counting.",
+      "ticker": [
+        "Streak on fire",
+        "Don't break the chain"
+      ],
+      "screen": "../gallery/screens/profile.html"
+    },
+    {
+      "id": "arch",
+      "layout": "arch",
+      "preset": "sunset",
+      "title": "Find your **focus**",
+      "subtitle": "Deep work, no distractions.",
+      "screen": "../gallery/screens/focus.html"
+    },
+    {
+      "id": "orbit",
+      "layout": "orbit",
+      "preset": "midnight",
+      "title": "Everything **in one orbit**",
+      "screen": "../gallery/screens/home.html",
+      "orbit": [
+        {
+          "icon": "🔥",
+          "text": "Streaks"
+        },
+        {
+          "icon": "⏰",
+          "text": "Smart reminders"
+        },
+        {
+          "icon": "📊",
+          "text": "Insights"
+        },
+        {
+          "icon": "🏆",
+          "text": "Badges"
+        }
+      ]
+    },
+    {
+      "id": "lens",
+      "layout": "lens",
+      "preset": "ocean",
+      "title": "Every detail, **up close**",
+      "subtitle": "Your streak, front and center.",
+      "screen": "../gallery/screens/home.html",
+      "lens": {
+        "at": [
+          30,
+          36
+        ],
+        "span": 44
+      },
+      "byTarget": {
+        "ipad": {
+          "lens": {
+            "at": [
+              61,
+              13
+            ],
+            "span": 30
+          }
+        }
+      }
+    },
+    {
+      "id": "layers",
+      "layout": "layers",
+      "preset": "lilac",
+      "title": "Built from **what matters**",
+      "subtitle": "Charts and heatmaps, layer by layer.",
+      "screen": "../gallery/screens/stats.html",
+      "layers": [
+        {
+          "crop": [
+            4,
+            24,
+            92,
+            20
+          ]
+        },
+        {
+          "crop": [
+            4,
+            47,
+            92,
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "id": "notify",
+      "layout": "notify",
+      "preset": "candy",
+      "title": "Nudges that **feel kind**",
+      "screen": "../gallery/screens/remind.html",
+      "notifications": [
+        {
+          "icon": "💧",
+          "title": "Drink water",
+          "text": "2 glasses to go — you've got this."
+        },
+        {
+          "icon": "📖",
+          "title": "Read 20 pages",
+          "text": "Your 30-day streak is waiting."
+        },
+        {
+          "icon": "🧘",
+          "title": "Meditate",
+          "text": "5 calm minutes before bed?"
+        }
+      ]
+    },
+    {
+      "id": "deck",
+      "layout": "deck",
+      "preset": "forest",
+      "title": "From plan to **progress**",
+      "subtitle": "Track, review, celebrate.",
+      "screen": "../gallery/screens/home.html",
+      "screen2": "../gallery/screens/stats.html",
+      "screen3": "../gallery/screens/profile.html"
+    }
+  ]
+}

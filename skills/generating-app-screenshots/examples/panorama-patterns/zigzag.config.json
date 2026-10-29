@@ -1,0 +1,92 @@
+{
+  "app": {
+    "name": "Panorama pattern: zigzag"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\""
+    }
+  ],
+  "output": "out/zigzag",
+  "theme": {
+    "preset": "candy",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "panorama": {
+    "pattern": "zigzag",
+    "background": {
+      "gradient": {
+        "angle": 90,
+        "stops": [
+          "#ffafbd",
+          "#e0b3ff 50%",
+          "#a6c1ff"
+        ]
+      },
+      "noise": 0.04
+    },
+    "elements": [
+      {
+        "type": "ribbon",
+        "y": 72,
+        "amp": 9,
+        "period": 180,
+        "width": 3.2,
+        "colors": [
+          "#ffffff",
+          "#fdf4ff",
+          "#ffffff"
+        ],
+        "opacity": 0.55,
+        "z": 1
+      }
+    ]
+  },
+  "slides": [
+    {
+      "id": "hook",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "screen": "../gallery/screens/home.html"
+    },
+    {
+      "id": "progress",
+      "title": "See your **progress** grow",
+      "screen": "../gallery/screens/stats.html"
+    },
+    {
+      "id": "remind",
+      "title": "Gentle **reminders**",
+      "screen": "../gallery/screens/remind.html"
+    },
+    {
+      "id": "badges",
+      "title": "Earn every **badge**",
+      "screen": "../gallery/screens/profile.html"
+    },
+    {
+      "id": "focus",
+      "title": "Deep **focus** mode",
+      "screen": "../gallery/screens/focus.html"
+    }
+  ]
+}

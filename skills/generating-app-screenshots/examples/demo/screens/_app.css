@@ -1,0 +1,8 @@
+*{box-sizing:border-box;margin:0}body{font:16px -apple-system,"Noto Sans JP","Noto Sans Arabic",sans-serif;background:#0f1020;color:#fff;min-height:100vh;padding:62px 22px 30px}
+.sb{position:absolute;top:18px;left:34px;right:30px;display:flex;justify-content:space-between;font-weight:600;font-size:16px}
+h1{font-size:34px;font-weight:800;margin:14px 0 18px}.card{background:#1b1d36;border-radius:22px;padding:18px;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:14px}.dot{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px}
+.ck{margin-inline-start:auto;width:30px;height:30px;border-radius:50%;border:3px solid #3b3e66}.ck.on{background:#7c5cff;border-color:#7c5cff}
+.big{font-size:64px;font-weight:900;background:linear-gradient(90deg,#ff8a5c,#ffcf5c);-webkit-background-clip:text;color:transparent}
+.muted{color:#9a9cc4;font-size:14px}.bars{display:flex;align-items:flex-end;gap:10px;height:150px;margin-top:12px}.bars i{flex:1;border-radius:8px;background:linear-gradient(#7c5cff,#4b3bd1)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(min-width:700px){body{padding:70px 48px}.wide{display:grid;grid-template-columns:1fr 1fr;gap:18px}h1{font-size:44px}}

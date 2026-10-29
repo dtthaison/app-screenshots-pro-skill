@@ -1,0 +1,82 @@
+{
+  "app": {
+    "name": "Panorama pattern: constellation"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\""
+    }
+  ],
+  "output": "out/constellation",
+  "theme": {
+    "preset": "midnight",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800,
+        900
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "panorama": {
+    "pattern": "constellation",
+    "background": {
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          "#030712",
+          "#0c1433 60%",
+          "#1e1b4b"
+        ]
+      },
+      "scene": {
+        "type": "stars",
+        "count": 520,
+        "seed": 11,
+        "starsTo": 1
+      }
+    }
+  },
+  "slides": [
+    {
+      "id": "hook",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "screen": "../gallery/screens/home.html"
+    },
+    {
+      "id": "progress",
+      "title": "See your **progress** grow",
+      "screen": "../gallery/screens/stats.html"
+    },
+    {
+      "id": "remind",
+      "title": "Gentle **reminders**",
+      "screen": "../gallery/screens/remind.html"
+    },
+    {
+      "id": "badges",
+      "title": "Earn every **badge**",
+      "screen": "../gallery/screens/profile.html"
+    },
+    {
+      "id": "focus",
+      "title": "Deep **focus** mode",
+      "screen": "../gallery/screens/focus.html"
+    }
+  ]
+}

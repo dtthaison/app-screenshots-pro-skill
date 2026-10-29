@@ -1,0 +1,9 @@
+node_modules/
+out/
+out-*/
+.build/
+.DS_Store
+*.log
+
+# Local test runs against real apps: they contain that app's brand assets, photos and fonts
+tests/

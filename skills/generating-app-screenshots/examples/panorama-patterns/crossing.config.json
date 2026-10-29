@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Panorama pattern: crossing"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\""
+    }
+  ],
+  "output": "out/crossing",
+  "theme": {
+    "preset": "forest",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "panorama": {
+    "pattern": "crossing",
+    "background": {
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          "#0f3b3a",
+          "#14524c 50%",
+          "#5eead4"
+        ]
+      },
+      "scene": {
+        "type": "ridge",
+        "height": 30,
+        "colors": [
+          "#2d6a5f",
+          "#1f4e46",
+          "#123a33"
+        ],
+        "seed": 11
+      }
+    }
+  },
+  "slides": [
+    {
+      "id": "hook",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "screen": "../gallery/screens/home.html"
+    },
+    {
+      "id": "progress",
+      "title": "See your **progress** grow",
+      "screen": "../gallery/screens/stats.html"
+    },
+    {
+      "id": "remind",
+      "title": "Gentle **reminders**",
+      "screen": "../gallery/screens/remind.html"
+    },
+    {
+      "id": "badges",
+      "title": "Earn every **badge**",
+      "screen": "../gallery/screens/profile.html"
+    },
+    {
+      "id": "focus",
+      "title": "Deep **focus** mode",
+      "screen": "../gallery/screens/focus.html"
+    }
+  ]
+}

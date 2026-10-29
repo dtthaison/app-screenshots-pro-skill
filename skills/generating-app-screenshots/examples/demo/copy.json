@@ -1,0 +1,57 @@
+{
+  "en-US": {
+    "hero.eyebrow": "Habit tracker",
+    "hero.title": "Build habits that **actually stick**",
+    "hero.subtitle": "Tiny daily wins, one streak at a time.",
+    "hero.badge": "⭐ 4.9 · 20K ratings",
+    "track.title": "Check off your day in **one tap**",
+    "track.subtitle": "Water, reading, running — all in one list.",
+    "insights.title": "See your **progress** grow",
+    "remind.title": "Gentle **reminders**, right on time",
+    "remind.subtitle": "Never break the streak."
+  },
+  "vi": {
+    "hero.eyebrow": "Theo dõi thói quen",
+    "hero.title": "Xây thói quen **bền vững** mỗi ngày",
+    "hero.subtitle": "Mỗi ngày một chiến thắng nhỏ.",
+    "hero.badge": "⭐ 4.9 · 20 nghìn đánh giá",
+    "track.title": "Hoàn thành ngày mới chỉ với **một chạm**",
+    "track.subtitle": "Uống nước, đọc sách, chạy bộ — tất cả trong một danh sách.",
+    "insights.title": "Thấy rõ **tiến bộ** của bạn",
+    "remind.title": "Nhắc nhở **nhẹ nhàng**, đúng giờ",
+    "remind.subtitle": "Không bao giờ đứt chuỗi."
+  },
+  "de": {
+    "hero.eyebrow": "Gewohnheitstracker",
+    "hero.title": "Gewohnheiten, die **wirklich bleiben**",
+    "hero.subtitle": "Kleine tägliche Erfolge, Serie für Serie.",
+    "hero.badge": "⭐ 4,9 · 20.000 Bewertungen",
+    "track.title": "Hake deinen Tag mit **einem Tipp** ab",
+    "track.subtitle": "Wasser, Lesen, Laufen – alles in einer Liste.",
+    "insights.title": "Sieh deinen **Fortschritt** wachsen",
+    "remind.title": "Sanfte **Erinnerungen**, genau zur richtigen Zeit",
+    "remind.subtitle": "Unterbrich nie deine Serie."
+  },
+  "ar": {
+    "hero.eyebrow": "متتبع العادات",
+    "hero.title": "ابنِ عادات **تدوم فعلًا**",
+    "hero.subtitle": "انتصارات يومية صغيرة، سلسلة تلو الأخرى.",
+    "hero.badge": "⭐ 4.9 · 20 ألف تقييم",
+    "track.title": "أنجز يومك **بلمسة واحدة**",
+    "track.subtitle": "الماء، القراءة، الجري — كلها في قائمة واحدة.",
+    "insights.title": "شاهد **تقدمك** ينمو",
+    "remind.title": "تذكيرات **لطيفة** في الوقت المناسب",
+    "remind.subtitle": "لا تقطع سلسلتك أبدًا."
+  },
+  "ja": {
+    "hero.eyebrow": "習慣トラッカー",
+    "hero.title": "**続く習慣**を、毎日少しずつ",
+    "hero.subtitle": "小さな達成を毎日積み重ねよう。",
+    "hero.badge": "⭐ 4.9 · 2万件の評価",
+    "track.title": "**ワンタップ**で今日をチェック",
+    "track.subtitle": "水分補給、読書、ランニングをひとつのリストで。",
+    "insights.title": "**成長**が目に見える",
+    "remind.title": "ちょうどいい時間に**やさしい通知**",
+    "remind.subtitle": "連続記録を途切れさせない。"
+  }
+}

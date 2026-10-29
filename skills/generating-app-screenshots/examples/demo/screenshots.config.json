@@ -1,0 +1,205 @@
+{
+  "app": {
+    "name": "Streakly"
+  },
+  "defaultLocale": "en-US",
+  "locales": [
+    "en-US",
+    "vi",
+    "de",
+    "ar",
+    "ja"
+  ],
+  "targets": [
+    "ios-6.9",
+    "ipad-13",
+    "android-phone",
+    "play-feature-graphic"
+  ],
+  "output": "out",
+  "strings": "copy.json",
+  "theme": {
+    "font": {
+      "family": "Plus Jakarta Sans"
+    },
+    "caption": {
+      "color": "#ffffff",
+      "accent": "#ffcf5c"
+    },
+    "highlight": {
+      "style": "color",
+      "color": "#ffcf5c"
+    },
+    "background": {
+      "color": "#14112e",
+      "mesh": [
+        {
+          "color": "#7c5cff",
+          "x": 15,
+          "y": 10,
+          "size": 55
+        },
+        {
+          "color": "#ff8a5c",
+          "x": 95,
+          "y": 55,
+          "size": 45,
+          "opacity": 0.7
+        },
+        {
+          "color": "#2b6cff",
+          "x": 10,
+          "y": 95,
+          "size": 50,
+          "opacity": 0.6
+        }
+      ],
+      "noise": 0.08
+    },
+    "device": {
+      "style": "real",
+      "color": "black-titanium"
+    }
+  },
+  "slides": [
+    {
+      "id": "hero",
+      "layout": "hero",
+      "eyebrow": "@hero.eyebrow",
+      "title": "@hero.title",
+      "subtitle": "@hero.subtitle",
+      "screen": "screens/home.html",
+      "elements": [
+        {
+          "type": "badge",
+          "text": "@hero.badge",
+          "x": 50,
+          "y": 36,
+          "size": 3,
+          "background": "#ffffff",
+          "color": "#14112e",
+          "byTarget": {
+            "ipad-13": {
+              "y": 30,
+              "size": 2.2
+            },
+            "play-feature-graphic": {
+              "x": 7,
+              "y": 78,
+              "size": 2.2,
+              "anchor": "left"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "track",
+      "layout": "text-top",
+      "title": "@track.title",
+      "subtitle": "@track.subtitle",
+      "screen": "screens/home.html",
+      "device": {
+        "color": "cosmic-orange"
+      },
+      "skipTargets": [
+        "play-feature-graphic"
+      ]
+    },
+    {
+      "id": "insights",
+      "layout": "tilt-left",
+      "title": "@insights.title",
+      "screen": "screens/stats.html",
+      "background": {
+        "gradient": {
+          "angle": 160,
+          "stops": [
+            "#ff8a5c",
+            "#ff5c8a 55%",
+            "#7c5cff"
+          ]
+        },
+        "pattern": {
+          "type": "dots",
+          "color": "rgba(255,255,255,.18)"
+        }
+      },
+      "elements": [
+        {
+          "type": "zoom",
+          "screen": "screens/stats.html",
+          "crop": [
+            3,
+            13,
+            94,
+            14
+          ],
+          "x": 30,
+          "y": 62,
+          "w": 52,
+          "rotate": -4,
+          "z": 6,
+          "byTarget": {
+            "ipad-13": {
+              "w": 40,
+              "y": 60
+            },
+            "android": {
+              "y": 66
+            }
+          }
+        }
+      ],
+      "skipTargets": [
+        "play-feature-graphic"
+      ]
+    },
+    {
+      "id": "remind",
+      "layout": "text-bottom",
+      "title": "@remind.title",
+      "subtitle": "@remind.subtitle",
+      "screen": "screens/remind.html",
+      "device": {
+        "style": "clay",
+        "color": "#f1ecff"
+      },
+      "background": {
+        "gradient": {
+          "type": "radial",
+          "at": "50% 20%",
+          "stops": [
+            "#2c2563",
+            "#0d0b1f 70%"
+          ]
+        }
+      },
+      "elements": [
+        {
+          "type": "arrow",
+          "from": [
+            90,
+            70
+          ],
+          "to": [
+            84,
+            48
+          ],
+          "color": "#ffcf5c",
+          "byTarget": {
+            "ipad-13": {
+              "hidden": true
+            },
+            "play-feature-graphic": {
+              "hidden": true
+            }
+          }
+        }
+      ],
+      "skipTargets": [
+        "play-feature-graphic"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "Streakly (panorama)"
+  },
+  "locales": [
+    "en-US",
+    "vi"
+  ],
+  "targets": [
+    "ios-6.9"
+  ],
+  "output": "out-panorama",
+  "strings": "copy.json",
+  "theme": {
+    "font": {
+      "family": "Plus Jakarta Sans"
+    },
+    "caption": {
+      "color": "#14112e"
+    },
+    "highlight": {
+      "style": "marker",
+      "color": "#ffcf5c"
+    },
+    "device": {
+      "style": "real",
+      "color": "natural-titanium"
+    }
+  },
+  "panorama": {
+    "background": {
+      "gradient": {
+        "angle": 100,
+        "stops": [
+          "#fff4e6",
+          "#ffe0ec 35%",
+          "#e6e0ff 70%",
+          "#d9f2ff"
+        ]
+      },
+      "mesh": [
+        {
+          "color": "#ffcf5c",
+          "x": 30,
+          "y": 80,
+          "size": 25,
+          "opacity": 0.5
+        }
+      ]
+    },
+    "elements": [
+      {
+        "type": "device",
+        "screen": "screens/stats.html",
+        "x": 200,
+        "y": 36,
+        "w": 62,
+        "rotate": -12,
+        "z": 3
+      },
+      {
+        "type": "shape",
+        "shape": "circle",
+        "fill": "#7c5cff",
+        "x": 100,
+        "y": 70,
+        "w": 40,
+        "blur": 8,
+        "opacity": 0.35,
+        "z": 1
+      }
+    ]
+  },
+  "slides": [
+    {
+      "id": "hero",
+      "layout": "hero",
+      "eyebrow": "@hero.eyebrow",
+      "title": "@hero.title",
+      "screen": "screens/home.html"
+    },
+    {
+      "id": "track",
+      "layout": "caption-only",
+      "title": "@track.title",
+      "caption": {
+        "y": 6,
+        "h": 22,
+        "valign": "top"
+      }
+    },
+    {
+      "id": "remind",
+      "layout": "caption-only",
+      "title": "@remind.title",
+      "subtitle": "@remind.subtitle",
+      "caption": {
+        "y": 6,
+        "h": 22,
+        "valign": "top",
+        "titleSize": 7.4
+      }
+    }
+  ]
+}

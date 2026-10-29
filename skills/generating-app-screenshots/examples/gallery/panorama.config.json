@@ -1,0 +1,295 @@
+{
+  "app": {
+    "name": "Panorama gallery — phones spanning several screenshots"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "iphone",
+      "w": 1320,
+      "h": 2868,
+      "model": "iphone",
+      "label": "iPhone 6.9\" panorama (6 slides)"
+    },
+    {
+      "id": "ipad",
+      "w": 2064,
+      "h": 2752,
+      "model": "ipad",
+      "label": "iPad 13\" panorama (6 slides)"
+    }
+  ],
+  "output": "out-panorama",
+  "theme": {
+    "preset": "aurora",
+    "font": {
+      "family": "Plus Jakarta Sans",
+      "weights": [
+        500,
+        600,
+        700,
+        800
+      ]
+    },
+    "device": {
+      "style": "real",
+      "glare": true
+    }
+  },
+  "panorama": {
+    "background": {
+      "gradient": {
+        "angle": 90,
+        "stops": [
+          "#160f3a",
+          "#2e1a6b 18%",
+          "#6d28d9 38%",
+          "#be185d 58%",
+          "#ea580c 80%",
+          "#f59e0b"
+        ]
+      },
+      "mesh": [
+        {
+          "color": "#22d3ee",
+          "x": 8,
+          "y": 90,
+          "size": 22,
+          "opacity": 0.45
+        },
+        {
+          "color": "#f472b6",
+          "x": 50,
+          "y": 8,
+          "size": 18,
+          "opacity": 0.4
+        },
+        {
+          "color": "#fde68a",
+          "x": 92,
+          "y": 95,
+          "size": 20,
+          "opacity": 0.5
+        }
+      ],
+      "noise": 0.06
+    },
+    "elements": [
+      {
+        "type": "arrow",
+        "from": [
+          30,
+          97
+        ],
+        "to": [
+          575,
+          93
+        ],
+        "curve": 0.012,
+        "width": 0.45,
+        "color": "rgba(255,255,255,.55)",
+        "z": 1
+      },
+      {
+        "type": "device",
+        "seam": 1,
+        "y": 38,
+        "w": 66,
+        "rotate": 11,
+        "screen": "screens/stats.html",
+        "color": "natural-titanium",
+        "z": 4,
+        "byTarget": {
+          "ipad": {
+            "w": 58,
+            "y": 34
+          }
+        },
+        "dx": 22
+      },
+      {
+        "type": "device",
+        "seam": 3,
+        "dx": -34,
+        "y": 32,
+        "w": 56,
+        "rotate": -9,
+        "screen": "screens/remind.html",
+        "z": 4,
+        "byTarget": {
+          "ipad": {
+            "w": 50,
+            "y": 28
+          }
+        }
+      },
+      {
+        "type": "device",
+        "seam": 3,
+        "dx": 18,
+        "y": 42,
+        "w": 56,
+        "rotate": 8,
+        "screen": "screens/profile.html",
+        "color": "desert-titanium",
+        "z": 5,
+        "byTarget": {
+          "ipad": {
+            "w": 50,
+            "y": 36
+          }
+        }
+      },
+      {
+        "type": "device",
+        "seam": 5,
+        "y": 34,
+        "w": 118,
+        "landscape": true,
+        "rotate": -7,
+        "screen": "screens/focus.html",
+        "color": "white-titanium",
+        "z": 4,
+        "byTarget": {
+          "ipad": {
+            "w": 84,
+            "y": 24
+          }
+        }
+      },
+      {
+        "type": "badge",
+        "seam": 5,
+        "y": 26,
+        "text": "🎧 Focus mode",
+        "size": 3,
+        "background": "#ffffff",
+        "color": "#3b0764",
+        "z": 6,
+        "byTarget": {
+          "ipad": {
+            "size": 2.1,
+            "y": 18
+          }
+        }
+      }
+    ]
+  },
+  "slides": [
+    {
+      "id": "hero",
+      "layout": "hero",
+      "eyebrow": "Habit tracker",
+      "title": "Build habits that **actually stick**",
+      "subtitle": "Swipe to see how →",
+      "screen": "screens/home.html",
+      "caption": {
+        "w": 80
+      },
+      "device": {
+        "w": 70,
+        "x": 40
+      }
+    },
+    {
+      "id": "insights",
+      "layout": "blank",
+      "elements": [
+        {
+          "type": "caption",
+          "title": "See your **progress** grow",
+          "subtitle": "Insights, trends and heatmaps.",
+          "x": 54,
+          "y": 6,
+          "w": 76,
+          "h": 20,
+          "titleSize": 7.2
+        }
+      ]
+    },
+    {
+      "id": "remind",
+      "layout": "blank",
+      "elements": [
+        {
+          "type": "caption",
+          "title": "Gentle **reminders**",
+          "subtitle": "Right on time, never pushy.",
+          "x": 50,
+          "y": 6,
+          "w": 84,
+          "h": 18,
+          "titleSize": 7.2
+        }
+      ]
+    },
+    {
+      "id": "achieve",
+      "layout": "blank",
+      "elements": [
+        {
+          "type": "caption",
+          "title": "Earn every **badge**",
+          "subtitle": "40+ milestones to unlock.",
+          "x": 50,
+          "y": 6,
+          "w": 84,
+          "h": 18,
+          "titleSize": 7.2
+        }
+      ]
+    },
+    {
+      "id": "focus",
+      "layout": "blank",
+      "elements": [
+        {
+          "type": "caption",
+          "title": "Go deep with **focus mode**",
+          "x": 56,
+          "y": 6,
+          "w": 80,
+          "h": 22,
+          "titleSize": 7.2
+        }
+      ]
+    },
+    {
+      "id": "closing",
+      "layout": "blank",
+      "elements": [
+        {
+          "type": "caption",
+          "title": "Small steps.\n**Big changes.**",
+          "x": 50,
+          "y": 70,
+          "w": 84,
+          "h": 18,
+          "titleSize": 8.6,
+          "valign": "center",
+          "byTarget": {
+            "ipad": {
+              "y": 71,
+              "h": 14
+            }
+          }
+        },
+        {
+          "type": "stars",
+          "x": 50,
+          "y": 90,
+          "size": 5.2,
+          "count": 5,
+          "byTarget": {
+            "ipad": {
+              "y": 86,
+              "size": 3.6
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
