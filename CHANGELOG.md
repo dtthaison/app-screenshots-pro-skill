@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 (2026-10-29)
+
+- `theme.caption.titleSize`, `subtitleSize` and `eyebrowSize` now apply to every slide. Before, each layout's own default size overrode them. A slide's own `caption` sizes still take priority.
+
 ## 1.0.0 (2026-10-29)
 
 First public release.

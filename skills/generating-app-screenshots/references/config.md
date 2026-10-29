@@ -61,6 +61,7 @@ Apple changes its table yearly — check the App Store Connect "Screenshot speci
   "font": { "family": "Plus Jakarta Sans", "weights": [400, 600, 800] },   // Google Font
   // local font: { "family": "Brand", "src": "fonts/Brand-Variable.ttf" }; system font: { "family": "SF Pro Display", "google": false }
   "caption": { "color": "#fff", "accent": "#ffcf5c", "titleWeight": 800, "subtitleOpacity": 0.85, "uppercase": false, "textShadow": "0 2px 12px rgba(0,0,0,.3)" },
+  // optional "titleSize" / "subtitleSize" / "eyebrowSize" (% of width) replace every layout's default size; slide "caption" sizes still win
   "highlight": { "style": "color", "color": "#ffcf5c" },   // color | marker | underline | gradient (+ "gradient": {...})
   "background": { ... },                                    // default for every slide
   "device": { "style": "real", "color": "black-titanium", "shadow": true, "glare": false }

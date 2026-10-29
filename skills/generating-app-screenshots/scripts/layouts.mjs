@@ -86,11 +86,14 @@ export function buildLayout(slide, ctx) {
   const card = theme.card || {};
   const pad = { tall: 3.4, tablet: 2.4, wide: 1.4 }[cls]; // card padding, % of width
 
+  // font sizes: layout default < theme.caption < slide.caption (auto-fit still shrinks to the box)
+  const themeSizes = Object.fromEntries(['titleSize', 'subtitleSize', 'eyebrowSize']
+    .filter((k) => theme.caption?.[k] != null).map((k) => [k, theme.caption[k]]));
   const caption = (o) => ({
     type: 'caption', id: 'caption', eyebrow: slide.eyebrow, title: slide.title, subtitle: slide.subtitle,
     x: 50, y: t.cy, w: t.cw, h: t.ch, align: 'center', valign: 'top', titleSize: t.ts,
     ...(slide.highlight ? { highlight: slide.highlight } : {}),
-    ...o, ...(slide.caption || {}),
+    ...o, ...themeSizes, ...(slide.caption || {}),
   });
   const device = (o, key = 'device') => {
     const d = { type: 'device', id: key, screen: slide.screen, ...(theme.device || {}), ...o, ...(slide[key] || {}) };
