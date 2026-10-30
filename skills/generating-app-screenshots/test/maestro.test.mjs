@@ -10,12 +10,14 @@ test('flowYaml quotes values and starts with appId', () => {
   assert.match(y, /- waitForAnimationToEnd\n/);
 });
 test('flowYaml nests objects and keeps booleans and numbers bare', () => {
-  assert.match(flowYaml('a', [sleep(2000)]), /- extendedWaitUntil:\n {4}visible: "__asp_never__"\n {4}timeout: 2000\n {2}optional: true\n/);
+  assert.match(flowYaml('a', [sleep(2000)]), /- extendedWaitUntil:\n {4}visible: "__asp_never__"\n {4}timeout: 2000\n {4}optional: true\n/);
 });
 test('stepCommands: tap by id uses the resolved point, then waits', () => {
   assert.deepEqual(stepCommands({ tap: { id: 'set-done-4-0' }, wait: 2 }, { x: 0.86, y: 0.41 }),
     [{ tapOn: { point: '86%,41%' } }, 'waitForAnimationToEnd', sleep(2000)]);
 });
+test('stepCommands: resolved points are whole percents (Maestro 2.6.1 rejects "46.5%")', () =>
+  assert.deepEqual(stepCommands({ tap: { text: 'General' } }, { x: 0.5, y: 0.4648 }), [{ tapOn: { point: '50%,46%' } }, 'waitForAnimationToEnd']));
 test('stepCommands: the other step kinds', () => {
   assert.deepEqual(stepCommands({ open: 'x://a' }), [{ openLink: 'x://a' }, 'waitForAnimationToEnd']);
   assert.deepEqual(stepCommands({ tap: { point: '50%,60.5%' } }), [{ tapOn: { point: '50%,60.5%' } }, 'waitForAnimationToEnd']);

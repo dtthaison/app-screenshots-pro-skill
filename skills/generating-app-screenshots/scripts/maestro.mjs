@@ -29,9 +29,12 @@ function emit(v, pad) {
 }
 export const flowYaml = (appId, commands) => `appId: ${scalar(appId)}\n---\n${emit(commands, '')}`;
 
-export const sleep = (ms) => ({ extendedWaitUntil: { visible: '__asp_never__', timeout: ms }, optional: true });
+// Maestro 2.6.1 rejects `optional` beside extendedWaitUntil ("Invalid Command Format"); inside the map it waits the
+// full timeout (checked: 2000 ms -> 2.3 s on the timeline) and ends WARNED, exit 0, with no duration in commands-*.json.
+export const sleep = (ms) => ({ extendedWaitUntil: { visible: '__asp_never__', timeout: ms, optional: true } });
 
-const pct = (f) => `${Math.round(f * 1000) / 10}%`;
+// Maestro 2.6.1 rejects fractional percentages ("46.5%" -> NumberFormatException), so whole percents only.
+const pct = (f) => `${Math.round(f * 100)}%`;
 export function stepCommands(step, point) {
   const out = [];
   if (step.open != null) out.push({ openLink: step.open });
