@@ -1,7 +1,7 @@
 # Video concepts
 
 The 11 concepts the recommender (`scripts/concepts.mjs`) chooses from. Each section is cited by `concepts.md#<id>` in
-`recommend.mjs` reasons. Beat seconds here match the beat templates in code; if they drift, a test fails.
+`recommend.mjs` reasons. Beat seconds here match the beat templates in code; keep them in sync by hand.
 
 ## Contents
 - How a concept is picked
