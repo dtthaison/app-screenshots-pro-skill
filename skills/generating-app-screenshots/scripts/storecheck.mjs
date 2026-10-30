@@ -3,6 +3,7 @@
 // Levels never change the exit code except ERROR: WARN and NOTE exit 0.
 import { CONCEPTS } from './concepts.mjs';
 import { motionLength, splitWords, wordCount } from './kinetic.mjs';
+import { restLen } from './video.mjs';
 
 const EPS = 1e-6;
 
@@ -20,7 +21,9 @@ const PRICE = new RegExp([
   `[${SYMBOLS}]\\s?\\d`, `\\d\\s?[${SYMBOLS}]`,
   `(?<![\\p{L}])(?:RM|Rp|R\\$)\\s?\\d`,
   `\\b(?:${CODES})\\s?\\d`, `\\d\\s?(?:${CODES})\\b`,
-  `\\/\\s?(?:month|mo|year|yr|week|monat|mois|mes)(?![\\p{L}])`, `\\/\\s?(?:月|tháng|年)`,
+  // a period word counts only right after an amount: a digit or a currency mark ("3x/week" is not a price)
+  `(?:\\d|[${SYMBOLS}円元원])\\s?\\/\\s?(?:month|mo|year|yr|week|monat|mois|mes)(?![\\p{L}])`,
+  `(?:\\d|[${SYMBOLS}円元원])\\s?\\/\\s?(?:月|tháng|年)`,
 ].join('|'), 'iu');
 export function priceMatch(text) {
   const m = PRICE.exec(String(text ?? ''));
@@ -73,9 +76,15 @@ export function conceptWarnings(conceptId, timeline, { hookVisibleAt = null, end
   const out = [], scenes = timeline?.scenes ?? [];
   if (hookVisibleAt != null && hookVisibleAt > 1 + EPS) out.push(`hook-timing: the first caption is fully visible at ${hookVisibleAt.toFixed(1)}s — it should be by 1.0s`);
   const ends = new Set(endCardIds);
+  // the end card comes last; without one the last scene is not judged as a beat
+  let beatScenes = scenes;
+  if (!ends.size && scenes.length) {
+    out.push(`end-card: concept "${conceptId}": no end card — the last scene should use layout end-card`);
+    beatScenes = scenes.slice(0, -1);
+  }
   const allowLong = LONG_OK.has(conceptId) && CONCEPTS.some((c) => c.id === conceptId);
   let longSeen = false;
-  for (const s of scenes) {
+  for (const s of beatScenes) {
     if (ends.has(s.id)) continue;
     const d = s.duration ?? s.end - s.start;
     if (d < 2 - EPS) out.push(`beat-length: scene "${s.id}" lasts ${d}s — beats last 2-5s`);
@@ -122,10 +131,14 @@ export function storeChecks({ target, locale, preview, scenes, timeline, disclos
   if (preview.concept) {
     const first = scenes.findIndex((s) => s.hasCaption);
     const f = first >= 0 ? timeline.scenes[first] : null;
-    const hookVisibleAt = f ? f.start + motionLength(f.captionMotion, f.words) : null;
+    // the entrance starts with the transition into the scene; restLen covers its delay and the caption motion
+    const hookVisibleAt = f ? Math.max(f.start, f.start - (f.transition?.dur ?? 0) + restLen(f)) : null;
     const endCardIds = scenes.filter((s) => s.layout === 'end-card').map((s) => s.id);
     warnings.push(...conceptWarnings(preview.concept, timeline, { hookVisibleAt, endCardIds }));
     if (disclose && !endCardIds.length) notes.push(`owner.disclose is set ("${disclose}") but the preview has no end-card scene — show it in the footage or add an end card (apple-disclose)`);
   }
   return { warnings, notes, errors };
 }
+
+// A draft stands in for a missing recording: it must be a still image, never a clip or an html mock.
+export const isStillImagePath = (p) => /\.(png|jpe?g|webp|gif|avif)$/i.test(String(p ?? '').split('?')[0]);
