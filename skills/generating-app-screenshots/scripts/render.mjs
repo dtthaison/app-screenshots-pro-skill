@@ -16,6 +16,8 @@ import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
 import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kinetic.mjs';
+import { frameDiffs } from './align.mjs';
+import { idleRuns, rateCurve, frameMap, linearMap, fitMap } from './ramp.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -561,21 +563,35 @@ async function resolvePreviews({ ffmpeg }) {
         if (info && dev) {
           const dur = Number.isFinite(scene.duration) ? scene.duration : DEFAULT_DURATION;
           const { start = 0, speed = 1 } = scene.clip || {};
-          // cut at clip.end or the scene end, whichever comes first
-          const end = Math.min(scene.clip?.end ?? Infinity, info.duration, start + dur * speed);
+          const auto = speed === 'auto';
+          if (!auto && !(typeof speed === 'number' && speed > 0)) throw new Error(`clip.speed must be a number above 0 or "auto" (got ${JSON.stringify(speed)})`);
+          // always extract at 1x: the map picks the frames. A number cuts at clip.end or the scene end; "auto" takes the whole span
+          const end = auto ? Math.min(scene.clip?.end ?? info.duration, info.duration) : Math.min(scene.clip?.end ?? Infinity, info.duration, start + dur * speed);
           const height = Math.round(screenRect(dev, { W, H }).height * VIDEO_SCALE);
-          const key = clipKey({ file: info.file, start, end, speed, height });
-          const ex = extractClip(ffmpeg, { file: info.file, start, end, speed, height, dir: path.join(OUT, '.build', 'clips', key) });
+          const key = clipKey({ file: info.file, start, end, speed: 1, height });
+          const ex = extractClip(ffmpeg, { file: info.file, start, end, speed: 1, height, dir: path.join(OUT, '.build', 'clips', key) });
           const rel = path.relative(BASE, info.file);
           if (!ex.count) throw new Error(`clip ${rel} gave no frames between ${start}s and ${end}s`);
-          if (ex.count / ex.fps < dur - 1 / ex.fps) warnSet.add(`clip ${rel} is ${(ex.count / ex.fps).toFixed(1)}s but scene "${scene.id}" lasts ${dur}s — the last frame holds`);
+          let map;
+          if (!auto) map = linearMap(ex.count, speed);
+          else {
+            // diffs are computed once per extraction and cached next to the frames
+            const cache = path.join(ex.dir, 'diffs.json');
+            let diffs = fs.existsSync(cache) ? Float64Array.from(JSON.parse(fs.readFileSync(cache, 'utf8'))) : null;
+            if (diffs?.length !== ex.count) { diffs = await frameDiffs(ex.files); fs.writeFileSync(cache, JSON.stringify([...diffs])); }
+            const idle = idleRuns(diffs, ex.fps), taps = [];   // taps: source frames, from the sidecar (Task 9)
+            if (Number.isFinite(scene.duration)) map = fitMap(diffs, ex.fps, { taps, targetFrames: Math.round(dur * ex.fps), idle, scene: scene.id }).map;
+            else { map = frameMap(rateCurve(ex.count, ex.fps, { idle, taps })); scene.duration = map.length / ex.fps; }
+          }
+          const shown = scene.duration ?? dur;
+          if (map.length / ex.fps < shown - 1 / ex.fps) warnSet.add(`clip ${rel} is ${(map.length / ex.fps).toFixed(1)}s but scene "${scene.id}" lasts ${shown}s — the last frame holds`);
           const ms = MODELS[dev.model]?.screen, want = dev.screenAspect || (ms && (dev.landscape ? 1 / ms : ms));
           if (want && Math.abs(info.height / info.width / want - 1) > 0.02) warnSet.add(`clip ${info.width}×${info.height} does not match the ${dev.model} screen (${want.toFixed(2)}:1) — it will be cropped`);
           // every element showing the clip (device2 / zoom / lens fall back to slide.screen, or name it) gets the first frame
           for (const e of els) if (e.screen === info.file || (typeof e.screen === 'string' && isClip(e.screen) && clipFile(e.screen, locale) === info.file)) e.screen = ex.files[0];
           dev.clipFrames = ex.files.map(fileUrl);
           imageMeta.set(ex.files[0], imageMeta.get(info.file));
-          clip = { frames: ex.count, fps: ex.fps };
+          clip = { frames: map.length, fps: ex.fps, map };
         } else if (scene.motion === 'scroll' && dev) {
           // the whole mock / long capture pans inside the screen; overflow = how much taller than the screen it is
           // measured against the aspect the device shows: its screenAspect, the model's screen, else (frameless, windows)

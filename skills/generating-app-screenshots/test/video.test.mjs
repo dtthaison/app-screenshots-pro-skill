@@ -52,6 +52,11 @@ test('drift scales 1 → 1.03 across the scene; scroll with overflow pans 0 → 
   assert.equal(stateAt(tl, 0).scenes[0].screen.scrollY, 0); assert.equal(stateAt(tl, 4).scenes[0].screen.scrollY, 1);
   assert.equal(tl.scenes[1].motion, 'drift'); assert.ok(stateAt(tl, 6).scenes[1].screen.scale > 1);
 });
+test('stateAt uses clip.map when present', () => {
+  const tl = buildTimeline({}, [{ id: 'a', duration: 1, clip: { frames: 4, fps: 30, map: Int32Array.from([0, 0, 5, 9]) } }]);
+  assert.equal(stateAt(tl, 2 / 30).scenes[0].screen.frame, 5);
+  assert.equal(stateAt(tl, 0.9).scenes[0].screen.frame, 9);             // past the map: its last entry
+});
 test('clip frames advance at fps and hold the last frame', () => {
   const tl = buildTimeline({}, [{ id: 'a', duration: 4, clip: { frames: 60, fps: 30 } }]);
   assert.equal(stateAt(tl, 1).scenes[0].screen.frame, 30);

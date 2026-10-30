@@ -93,7 +93,9 @@ export function stateAt(tl, t) {
       }
 
       const p = prog(t, s.start, s.duration);
-      const frame = s.clip ? Math.min(s.clip.frames - 1, Math.max(0, Math.floor((t - s.start) * s.clip.fps))) : null;
+      // a speed-ramped clip carries a map (output frame -> source frame); otherwise one source frame per output frame
+      const k = s.clip ? Math.max(0, Math.floor((t - s.start) * s.clip.fps)) : 0;
+      const frame = !s.clip ? null : s.clip.map ? s.clip.map[Math.min(s.clip.map.length - 1, k)] : Math.min(s.clip.frames - 1, k);
       return {
         id: s.id, visible, opacity, tx, veil,
         device: { opacity: dev, dy: s.continuous ? 0 : rise * (1 - dev) },
