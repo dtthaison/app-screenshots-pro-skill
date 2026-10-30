@@ -10,7 +10,8 @@
   },
   "scripts": {
     "render": "node scripts/render.mjs",
-    "test": "node scripts/render.mjs examples/demo/screenshots.config.json --locales en-US --targets ios-6.9 --no-preview",
+    "test": "npm run test:unit && node scripts/render.mjs examples/demo/screenshots.config.json --locales en-US --targets ios-6.9 --no-preview",
+    "test:unit": "node --test test/*.test.mjs",
     "example:demo": "node scripts/render.mjs examples/demo/screenshots.config.json && node scripts/render.mjs examples/demo/panorama.config.json",
     "example:gallery": "node scripts/render.mjs examples/gallery/layouts.config.json && node scripts/render.mjs examples/gallery/panorama.config.json",
     "example:signature": "node scripts/render.mjs examples/signature/signature.config.json",
