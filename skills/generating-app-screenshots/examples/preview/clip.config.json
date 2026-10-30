@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "Streakly"
+  },
+  "locales": [
+    "en-US"
+  ],
+  "targets": [
+    {
+      "id": "clip",
+      "w": 880,
+      "h": 1912,
+      "video": {
+        "minSec": 1,
+        "maxSec": 60
+      }
+    }
+  ],
+  "output": "out",
+  "previews": [
+    {
+      "id": "walk",
+      "loop": "hard",
+      "scenes": [
+        {
+          "id": "walk",
+          "layout": "blank",
+          "duration": 6,
+          "in": "none",
+          "motion": "scroll",
+          "elements": [
+            {
+              "type": "device",
+              "id": "device",
+              "model": "none",
+              "style": "frameless",
+              "radius": 0,
+              "shadow": false,
+              "x": 50,
+              "y": 0,
+              "w": 100,
+              "screen": "screens/walk.html"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

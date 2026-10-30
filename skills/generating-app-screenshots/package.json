@@ -12,13 +12,16 @@
     "render": "node scripts/render.mjs",
     "test": "npm run test:unit && node scripts/render.mjs examples/demo/screenshots.config.json --locales en-US --targets ios-6.9 --no-preview",
     "test:unit": "node --test test/*.test.mjs",
+    "test:video": "node scripts/render.mjs examples/preview/preview.config.json --only-previews --locales en-US --targets preview-iphone --no-preview",
     "example:demo": "node scripts/render.mjs examples/demo/screenshots.config.json && node scripts/render.mjs examples/demo/panorama.config.json",
     "example:gallery": "node scripts/render.mjs examples/gallery/layouts.config.json && node scripts/render.mjs examples/gallery/panorama.config.json",
     "example:signature": "node scripts/render.mjs examples/signature/signature.config.json",
     "example:devices": "node scripts/render.mjs examples/devices/devices.config.json",
     "example:patterns": "for f in examples/panorama-patterns/*.config.json; do node scripts/render.mjs \"$f\" || exit 1; done",
+    "example:preview": "node scripts/render.mjs examples/preview/preview.config.json",
+    "example:preview-clip": "node scripts/render.mjs examples/preview/clip.config.json --only-previews",
     "site": "node scripts/build-site.mjs",
-    "examples": "npm run example:demo && npm run example:gallery && npm run example:signature && npm run example:devices && npm run example:patterns"
+    "examples": "npm run example:demo && npm run example:gallery && npm run example:signature && npm run example:devices && npm run example:patterns && npm run example:preview"
   },
   "optionalDependencies": {
     "ffmpeg-static": "^5.3.0"
