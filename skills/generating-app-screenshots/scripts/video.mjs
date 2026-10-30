@@ -1,6 +1,7 @@
 // Timeline math for app previews: scenes -> timings, and "what does every scene look
 // like at time t". Pure (no DOM, no ffmpeg) so it is unit-testable; the renderer
 // applies stateAt() to a page that has every scene stacked (later scenes paint above).
+import { CAPTION_MOTIONS, unitProgress, popValue, motionLength } from './kinetic.mjs';
 export const FPS = 30;
 export const TRANSITIONS = { crossfade: 0.5, push: 0.6, cut: 0, 'fade-through': 0.6 };
 export const ENTRANCES = {
@@ -15,6 +16,7 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (p) => 1 - (1 - clamp01(p)) ** 3;                 // ease-out cubic
 const prog = (t, from, len) => (len > 0 ? ease((t - from) / len) : t >= from ? 1 : 0);
 const entranceLen = (e) => (e ? e.delay + e.caption : 0);      // device (0.6) ends with the caption (0.1 + 0.5)
+const restLen = (s) => Math.max(entranceLen(ENTRANCES[s.entrance]), s.captionMotion === 'rise' ? 0 : (ENTRANCES[s.entrance]?.delay ?? 0) + motionLength(s.captionMotion, s.words));
 const ms = (x) => Math.round(x * 1000) / 1000;                 // 3 + 3.4 + 11.8 + 11.8 is 30.000000000000004 in floats
 const secs = (x) => `${+x.toFixed(2)}s`;                       // for messages: at most two decimals
 
@@ -36,12 +38,14 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
     if (s.in != null && !Object.hasOwn(ENTRANCES, s.in)) errors.push(`scene "${s.id}": unknown entrance "${s.in}"`);
     // scene 1 starts complete by default (the video opens on it and loops back to it); later scenes rise in
     const entrance = Object.hasOwn(ENTRANCES, s.in) ? s.in : index === 0 ? 'none' : 'rise';
+    if (s.captionMotion != null && !CAPTION_MOTIONS.includes(s.captionMotion)) errors.push(`scene "${s.id}": unknown captionMotion "${s.captionMotion}" (${CAPTION_MOTIONS.join(', ')})`);
     const clipOk = s.clip && s.clip.frames > 0 && s.clip.fps > 0;
     if (s.clip && !clipOk) errors.push(`scene "${s.id}": clip needs frames and fps`);
     const motion = clipOk ? 'none' : s.motion === 'scroll' && !(s.overflow >= SCROLL_MIN) ? 'drift' : s.motion ?? 'drift';
     return {
       id: s.id, index, start, end: cursor, duration, transition: { kind, dur: TRANSITIONS[kind] ?? 0 },
-      entrance, motion, clip: clipOk ? s.clip : null, overflow: s.overflow ?? 0,
+      entrance, motion, captionMotion: CAPTION_MOTIONS.includes(s.captionMotion) ? s.captionMotion : 'rise', words: s.words ?? 1,
+      clip: clipOk ? s.clip : null, overflow: s.overflow ?? 0,
       continuous: index > 0 && !!s.continuous,                 // same layout and device as the scene before: the device stays put
       labels: (s.labels ?? []).map((l) => ({ at: l.at ?? 0, until: l.until ?? duration, text: l.text })),
       fadeIn: 0, fadeOut: 0,
@@ -80,13 +84,20 @@ export function stateAt(tl, t) {
       const e = ENTRANCES[s.entrance];
       const dev = e && !s.continuous ? prog(t, a, e.device) : 1, cap = e ? prog(t, a + e.delay, e.caption) : 1;
       const rise = e?.rise ?? 0;
+      // kinetic caption: units start where the rise would, the caption box itself stays put and opaque
+      const ck = s.captionMotion, kinetic = ck === 'words' || ck === 'lines' || ck === 'pop';
+      let units = [], pop = null;
+      if (kinetic) {
+        const tc = Math.min(motionLength(ck, s.words), Math.max(0, t - (a + (e?.delay ?? 0))));
+        if (ck === 'pop') pop = popValue(tc); else units = unitProgress(ck, tc, s.words);
+      }
 
       const p = prog(t, s.start, s.duration);
       const frame = s.clip ? Math.min(s.clip.frames - 1, Math.max(0, Math.floor((t - s.start) * s.clip.fps))) : null;
       return {
         id: s.id, visible, opacity, tx, veil,
         device: { opacity: dev, dy: s.continuous ? 0 : rise * (1 - dev) },
-        caption: { opacity: cap, dy: rise * (1 - cap) },
+        caption: kinetic ? { opacity: 1, dy: 0, units, pop } : { opacity: cap, dy: rise * (1 - cap), units, pop },
         screen: { scale: s.motion === 'drift' ? 1 + (DRIFT - 1) * p : 1, scrollY: s.motion === 'scroll' ? p : 0, frame },
         labels: s.labels.map((l) => ({
           opacity: Math.min(prog(t, s.start + l.at, LABEL_FADE), 1 - prog(t, s.start + l.until - LABEL_FADE, LABEL_FADE)),
@@ -109,7 +120,7 @@ export function posterTime(tl, poster) {
     if (scene) {
       // the entrance starts with the transition into the scene; rest = entrance over, and the scene fully in
       const s = scene, next = tl.scenes[s.index + 1]?.transition.dur ?? 0;
-      want = ms(Math.max(s.start, s.start - s.transition.dur + entranceLen(ENTRANCES[s.entrance])));
+      want = ms(Math.max(s.start, s.start - s.transition.dur + restLen(s)));
       lo = s.start; hi = Math.min(hi, ms(s.end - next));  // before the next scene covers it
     } else warnings.push(`poster scene "${poster}" not found; using ${want}s`);
   }
@@ -121,7 +132,7 @@ export function posterTime(tl, poster) {
   }
   for (const s of tl.scenes) {
     const from = s.start - s.transition.dur;
-    if (ENTRANCES[s.entrance] && time >= from && time < from + entranceLen(ENTRANCES[s.entrance])) warnings.push(`poster ${f} falls inside the entrance of scene "${s.id}"`);
+    if ((ENTRANCES[s.entrance] || s.captionMotion !== 'rise') && time >= from && time < from + restLen(s)) warnings.push(`poster ${f} falls inside the entrance of scene "${s.id}"`);
   }
   const first = tl.scenes[0], last = tl.scenes.at(-1);
   if ((first?.fadeIn && time < first.fadeIn) || (last?.fadeOut && time > tl.total - last.fadeOut)) warnings.push(`poster ${f} falls inside the loop fade`);

@@ -15,6 +15,7 @@ import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
+import { splitWords, wordsHtml, resolveCaptionMotion } from './kinetic.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -245,11 +246,12 @@ function captionHtml(el, ctx, locale) {
       : hl.style === 'underline' ? `text-decoration:underline ${hl.color || 'currentColor'};text-decoration-thickness:.08em;text-underline-offset:.12em`
       : `color:${hl.color || c.accent || '#ffd60a'}`;
   const parts = [];
+  const kinetic = el.motion === 'words' || el.motion === 'lines', kx = kinetic ? 'class="kx" ' : '';
   const eyebrow = str(c.eyebrow, locale), title = str(c.title, locale), sub = str(c.subtitle, locale);
   const ts = (c.titleSize ?? 7) * S, ss = (c.subtitleSize ?? (c.titleSize ?? 7) * 0.5) * S, es = (c.eyebrowSize ?? (c.titleSize ?? 7) * 0.36) * S;
-  if (eyebrow) parts.push(`<div data-fs="${es}" style="${c.subtitleFont ? `font-family:${fontStack(c.subtitleFont, locale)};` : ''}font-size:${px(es)};font-weight:${c.eyebrowWeight ?? 700};letter-spacing:.12em;text-transform:uppercase;color:${c.eyebrowColor || c.accent || c.color || '#fff'};margin-bottom:${px(es * 0.7)}">${rich(eyebrow)}</div>`);
-  if (title) parts.push(`<div data-fs="${ts}" style="font-size:${px(ts)};font-weight:${c.titleWeight ?? 800};line-height:${c.lineHeight ?? 1.08};letter-spacing:${c.letterSpacing ?? '-0.02em'};color:${c.color || '#fff'};${c.uppercase ? 'text-transform:uppercase;' : ''}${c.textShadow ? `text-shadow:${c.textShadow};` : ''}text-wrap:balance">${rich(title)}</div>`);
-  if (sub) parts.push(`<div data-fs="${ss}" style="${c.subtitleFont ? `font-family:${fontStack(c.subtitleFont, locale)};` : ''}font-size:${px(ss)};font-weight:${c.subtitleWeight ?? 500};line-height:1.3;color:${c.subtitleColor || c.color || '#fff'};opacity:${c.subtitleOpacity ?? 0.85};margin-top:${px(ss * 0.6)};text-wrap:balance">${rich(sub)}</div>`);
+  if (eyebrow) parts.push(`<div ${kx}data-fs="${es}" style="${c.subtitleFont ? `font-family:${fontStack(c.subtitleFont, locale)};` : ''}font-size:${px(es)};font-weight:${c.eyebrowWeight ?? 700};letter-spacing:.12em;text-transform:uppercase;color:${c.eyebrowColor || c.accent || c.color || '#fff'};margin-bottom:${px(es * 0.7)}">${rich(eyebrow)}</div>`);
+  if (title) parts.push(`<div data-fs="${ts}" style="font-size:${px(ts)};font-weight:${c.titleWeight ?? 800};line-height:${c.lineHeight ?? 1.08};letter-spacing:${c.letterSpacing ?? '-0.02em'};color:${c.color || '#fff'};${c.uppercase ? 'text-transform:uppercase;' : ''}${c.textShadow ? `text-shadow:${c.textShadow};` : ''}text-wrap:balance">${kinetic ? wordsHtml(splitWords(title), rich) : rich(title)}</div>`);
+  if (sub) parts.push(`<div ${kx}data-fs="${ss}" style="${c.subtitleFont ? `font-family:${fontStack(c.subtitleFont, locale)};` : ''}font-size:${px(ss)};font-weight:${c.subtitleWeight ?? 500};line-height:1.3;color:${c.subtitleColor || c.color || '#fff'};opacity:${c.subtitleOpacity ?? 0.85};margin-top:${px(ss * 0.6)};text-wrap:balance">${rich(sub)}</div>`);
   const w = (el.w / 100) * ctx.W, h = ((el.h ?? 20) / 100) * ctx.H;
   const left = (el.x / 100) * ctx.W - w / 2, top = (el.y / 100) * ctx.H;
   const jc = { top: 'flex-start', center: 'center', bottom: 'flex-end' }[el.valign || 'top'];
@@ -589,9 +591,12 @@ async function resolvePreviews({ ffmpeg }) {
         for (const e of els) if (typeof e.screen === 'string' && isClip(e.screen)) throw new Error(`${e.screen}: a clip plays only on the scene's main device (id "device") — give ${e.id || e.type} a still`);
         // labels: badges under the caption (above a bottom caption), lined up with it, above the device edge (z 6)
         const cap = els.find((e) => e.type === 'caption');
+        const captionMotion = resolveCaptionMotion(pick.indexOf(sc0), sp, preview, vdef);
+        let words = 1;
+        if (cap) { cap.motion = captionMotion; words = Math.max(1, splitWords(str(cap.title, locale) ?? '').length); }
         const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: cap?.x ?? 50, z: 6,
           y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
-        scenes.push({ scene: { ...scene, labels: timed }, s, th, els, clip, overflow, labelEls });
+        scenes.push({ scene: { ...scene, labels: timed, captionMotion, words }, s, th, els, clip, overflow, labelEls });
       } catch (e) { errors.push(`[${tag}/${scene.id}] ${e.message}`); }
     }
     if (!scenes.length) { errors.push(`[${tag}] no scenes to render for this target`); continue; }
@@ -648,6 +653,22 @@ async function applyState(state) {
     root.style.transform = `translateX(${sc.tx * 100}%)`;
     for (const role of ['device', 'caption']) {
       for (const a of root.querySelectorAll(`:scope > .anim[data-role="${role}"]`)) { a.style.opacity = sc[role].opacity; a.style.transform = `translateY(${sc[role].dy * H}px)`; }
+    }
+    // kinetic caption: words (or lines, grouped by offsetTop) rise out of their clipping boxes; eyebrow and subtitle follow the last unit
+    const { units, pop } = sc.caption;
+    const kws = [...root.querySelectorAll('.kw')];
+    if (units.length && kws.length) {
+      const tops = [...new Set(kws.map((k) => k.offsetTop))].sort((x, y) => x - y);
+      const byLine = window.__timeline.scenes.find((x) => x.id === sc.id)?.captionMotion === 'lines';
+      kws.forEach((k, i) => {
+        const p = units[byLine ? tops.indexOf(k.offsetTop) : i] ?? 1;
+        k.firstElementChild.style.transform = `translateY(${(1 - p) * 110}%)`;
+      });
+      const last = units[byLine ? tops.length - 1 : kws.length - 1] ?? 1;
+      for (const x of root.querySelectorAll('.kx')) { x.dataset.o0 ??= x.style.opacity || '1'; x.style.opacity = x.dataset.o0 * last; }
+    }
+    if (pop) {
+      for (const f of root.querySelectorAll(':scope > .anim[data-role="caption"] .fit-inner')) { f.style.transform = `scale(${pop.scale})`; f.style.opacity = pop.opacity; }
     }
     sc.labels.forEach((l, k) => { const a = root.querySelector(`:scope > .anim[data-role="label"][data-i="${k}"]`); if (a) a.style.opacity = l.opacity; });
     const img = root.querySelector('[data-el="device"] .scr');
