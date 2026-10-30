@@ -28,9 +28,38 @@ test('budget: no ask-answer; before-after or results-first picked', () => {
   assert.ok(ids.includes('before-after') || ids.includes('results-first'));
 });
 
-test('mustAvoid paywall: no pick uses the paywall moment', () => {
+test('mustAvoid paywall fixture: no pick uses the paywall moment', () => {
   const r = recommend(load('fitness-avoid-paywall-brief.json'));
   assert.ok(r.picks.every((p) => p.beats.every((b) => b.moment !== 'paywall')));
+});
+
+const usedMoments = (r) => new Set(r.picks.flatMap((p) => p.beats.map((b) => b.moment).filter(Boolean)));
+const refs = (r) => r.picks.flatMap((p) => p.reasons.map((x) => x.ref));
+
+test('mustAvoid by moment id removes a moment that is otherwise picked', () => {
+  const base = load('fitness-brief.json');
+  assert.ok(usedMoments(recommend(base)).has('swap'));
+  const b = structuredClone(base); b.owner.mustAvoid = ['swap'];
+  assert.ok(!usedMoments(recommend(b)).has('swap'));
+});
+
+test('mustAvoid by signal removes moments carrying it, and the signal is not cited', () => {
+  const base = load('fitness-brief.json');
+  base.signals = base.signals.filter((s) => s !== 'counter'); // counter then lives only on the progress moment
+  const before = recommend(base);
+  assert.ok(usedMoments(before).has('progress'));
+  assert.ok(refs(before).includes('signals.counter'));
+  const b = structuredClone(base); b.owner.mustAvoid = ['counter'];
+  const after = recommend(b);
+  assert.ok(!usedMoments(after).has('progress'));
+  assert.ok(!refs(after).includes('signals.counter'));
+});
+
+test('avoidWhen excludes a concept: hero-moment with many-features', () => {
+  const b = { app: { name: 'X', category: 'ai' }, signals: ['ai-stream', 'many-features'], moments: [], owner: { confirmed: true } };
+  assert.ok(recommend(b).excluded.some((e) => e.id === 'hero-moment' && /many-features/.test(e.reason)));
+  b.signals = ['ai-stream'];
+  assert.ok(!recommend(b).excluded.some((e) => e.id === 'hero-moment'));
 });
 
 test('every pick has code, owner or kb reasons and beats summing to 15s', () => {
@@ -91,4 +120,15 @@ test('fewer than 3 concepts fit: says so', () => {
   const r = recommend({ app: { name: 'X', category: 'games' }, signals: [], moments: [], owner: { confirmed: true } });
   assert.ok(r.picks.length < 3);
   assert.ok(r.notes.some((n) => /^only \d concepts? fit/.test(n)));
+});
+
+test('validateBrief returns errors instead of throwing on malformed shapes', () => {
+  const ok = load('fitness-brief.json');
+  const run = (mut) => { const b = structuredClone(ok); mut(b); return validateBrief(b); };
+  assert.ok(run((b) => { b.signals = 'timer'; }).includes('signals must be an array'));
+  assert.ok(run((b) => { b.moments = {}; }).includes('moments must be an array'));
+  assert.ok(run((b) => { b.moments[1] = null; }).includes('moments[1] must be an object'));
+  assert.ok(run((b) => { b.moments[0].signals = 'timer'; }).includes('moment "log-set" signals must be an array'));
+  assert.ok(run((b) => { b.owner.mustShow = 'coach'; }).includes('owner.mustShow must be an array'));
+  assert.ok(validateBrief(null).length && validateBrief([]).length);
 });

@@ -63,19 +63,27 @@ export const CONCEPTS = [
 
 export function validateBrief(brief) {
   const errs = [];
-  if (!brief || typeof brief !== 'object') return ['brief must be a JSON object'];
-  const app = brief.app || {};
+  if (!brief || typeof brief !== 'object' || Array.isArray(brief)) return ['brief must be a JSON object'];
+  const app = brief.app && typeof brief.app === 'object' ? brief.app : {};
   if (!app.name) errs.push('app.name is missing');
   if (!CATEGORIES.includes(app.category)) errs.push(`app.category "${app.category}" is not one of: ${CATEGORIES.join(', ')}`);
-  for (const s of brief.signals || []) if (!SIGNALS.includes(s)) errs.push(`unknown signal "${s}" in app signals`);
+  const arr = (v, label) => {
+    if (v === undefined) return [];
+    if (!Array.isArray(v)) { errs.push(`${label} must be an array`); return []; }
+    return v;
+  };
+  for (const s of arr(brief.signals, 'signals')) if (!SIGNALS.includes(s)) errs.push(`unknown signal "${s}" in app signals`);
   const ids = new Set();
-  for (const m of brief.moments || []) {
+  arr(brief.moments, 'moments').forEach((m, i) => {
+    if (!m || typeof m !== 'object' || Array.isArray(m)) { errs.push(`moments[${i}] must be an object`); return; }
     if (ids.has(m.id)) errs.push(`duplicate moment id "${m.id}"`);
     ids.add(m.id);
-    for (const s of m.signals || []) if (!SIGNALS.includes(s)) errs.push(`unknown signal "${s}" in moment "${m.id}"`);
+    for (const s of arr(m.signals, `moment "${m.id}" signals`)) if (!SIGNALS.includes(s)) errs.push(`unknown signal "${s}" in moment "${m.id}"`);
     if (![true, false, 'network'].includes(m.automatable)) errs.push(`moment "${m.id}" automatable must be true, false or "network"`);
-  }
-  for (const id of brief.owner?.mustShow || []) if (!ids.has(id)) errs.push(`owner.mustShow "${id}" is not a moment id`);
+  });
+  const owner = brief.owner && typeof brief.owner === 'object' ? brief.owner : {};
+  for (const id of arr(owner.mustShow, 'owner.mustShow')) if (!ids.has(id)) errs.push(`owner.mustShow "${id}" is not a moment id`);
+  arr(owner.mustAvoid, 'owner.mustAvoid');
   return errs;
 }
 
