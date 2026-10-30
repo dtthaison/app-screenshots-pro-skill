@@ -380,9 +380,11 @@ export function buildLayout(slide, ctx) {
     case 'text-left':
     case 'text-right': {
       const left = layout === 'text-left';
+      // 21:9 header: a smaller phone and a narrower caption leave room for both side by side
+      const header = cls === 'wide' && W / H >= 2;
       return [
-        caption({ x: left ? 29 : 71, y: t.cy, w: t.cw, h: t.ch, align: left ? 'left' : 'right', valign: 'center' }),
-        withFit(device({ x: left ? 76 : 24 }), t.dTop, t.dBot, t.dMax),
+        caption({ x: left ? 29 : 71, y: t.cy, w: header ? 40 : t.cw, h: t.ch, align: left ? 'left' : 'right', valign: 'center' }),
+        withFit(device({ x: left ? 76 : 24 }), t.dTop, t.dBot, header ? 22 : t.dMax),
       ];
     }
 

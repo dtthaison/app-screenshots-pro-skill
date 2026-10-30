@@ -8,7 +8,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { chromium } from 'playwright-core';
-import { resolveTarget, storeLocale, isRtl, scriptFont } from './targets.mjs';
+import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
 import { renderDevice, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass } from './layouts.mjs';
@@ -30,6 +30,8 @@ const LOCALES = list(flag('locales')) || cfg.locales || [defaultLocale];
 // --targets filters by id; ids may name custom targets declared in the config
 const CFG_TARGETS = (cfg.targets || ['ios-6.9']).map((t) => resolveTarget(t));
 const TARGETS = list(flag('targets'))?.map((id) => CFG_TARGETS.find((t) => t.id === id) || resolveTarget(id)) || CFG_TARGETS;
+// the screenshot pass renders stills only; video targets belong to the video pass
+const STILL_TARGETS = TARGETS.filter((t) => !isVideoTarget(t));
 const SLIDE_FILTER = list(flag('slides'));
 // theme.preset (and slide.preset) start from a curated palette; explicit values win
 function presetTheme(name) {
@@ -277,7 +279,7 @@ function elementHtml(el, ctx, locale) {
     case 'badge': {
       const fam = fontStack(el.font || (ctx.theme || theme).font, locale);
       const fs = (el.size ?? 3) * S;
-      return `<div class="el" style="${box(`font-family:${fam};font-size:${px(fs)};font-weight:${el.weight ?? 700};color:${el.color || '#111'};background:${gradientCss(el.background || '#fff')};padding:${px(fs * 0.45)} ${px(fs * 0.9)};border-radius:${px(fs * 2)};white-space:nowrap;box-shadow:${el.shadow || 'none'}`)}">${rich(str(el.text, locale) ?? '')}</div>`;
+      return `<div class="el" data-badge="${esc(ctx.slideId)}:${esc(el.id || 'badge')}" style="${box(`font-family:${fam};font-size:${px(fs)};font-weight:${el.weight ?? 700};color:${el.color || '#111'};background:${gradientCss(el.background || '#fff')};padding:${px(fs * 0.45)} ${px(fs * 0.9)};border-radius:${px(fs * 2)};white-space:nowrap;box-shadow:${el.shadow || 'none'}`)}">${rich(str(el.text, locale) ?? '')}</div>`;
     }
     case 'image': {
       const src = str(el.src, locale).replaceAll('{locale}', locale);
@@ -472,11 +474,14 @@ function pageHtml(sheet) {
 .bg{position:absolute;inset:0}.fit-inner{width:100%}img{display:block}
 </style></head><body>${sheet.body}
 <script>window.__pano = ${sheet.panorama ? JSON.stringify({ W: sheet.slideW, n: sheet.n }) : 'null'};
-window.__fit = async () => {
+window.__safe = ${JSON.stringify(sheet.safe || null)};
+// scope: optional CSS selector; every query then runs inside that element (the video pass fits one overlay at a time)
+window.__fit = async (scope) => {
   await document.fonts.ready;
   await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+  const root = scope ? document.querySelector(scope) : document;
   const report = [];
-  for (const box of document.querySelectorAll('[data-fit]')) {
+  for (const box of root.querySelectorAll('[data-fit]')) {
     const inner = box.querySelector('.fit-inner'); const maxH = +box.dataset.maxh;
     const nodes = [...box.querySelectorAll('[data-fs]')];
     let s = 1; const apply = () => nodes.forEach(n => n.style.fontSize = (n.dataset.fs * s) + 'px');
@@ -487,7 +492,7 @@ window.__fit = async () => {
   // text covered by a device/image painted above it: sample points along every text line and ask the
   // browser what is on top there (exact for rotated / 3D devices, unlike bounding boxes)
   const cover = 'html .el.device, html img.el';
-  for (const box of document.querySelectorAll('[data-fit]')) {
+  for (const box of root.querySelectorAll('[data-fit]')) {
     const r = document.createRange(); r.selectNodeContents(box.querySelector('.fit-inner'));
     const lines = [...r.getClientRects()].filter(l => l.width > 2);
     let hit = false;
@@ -505,18 +510,36 @@ window.__fit = async () => {
   // panorama seams: the stores draw a gap between cards, so captions must stay clear; devices crossing are noted
   if (window.__pano) {
     const { W, n } = window.__pano, near = W * 0.035;
-    for (const box of document.querySelectorAll('[data-fit]')) {
+    for (const box of root.querySelectorAll('[data-fit]')) {
       const r = document.createRange(); r.selectNodeContents(box.querySelector('.fit-inner'));
       for (const l of [...r.getClientRects()].filter(l => l.width > 2)) {
         const k = [...Array(n - 1)].map((_, i) => (i + 1) * W).find(sx => l.left < sx + near && l.right > sx - near);
         if (k) { report.push({ id: box.dataset.id, seam: Math.round(k / W) }); break; }
       }
     }
-    document.querySelectorAll('.el.device').forEach((d) => {
+    root.querySelectorAll('.el.device').forEach((d) => {
       const b = d.getBoundingClientRect();
       for (let k = 1; k < n; k++) if (b.left < k * W - W * 0.02 && b.right > k * W + W * 0.02)
         report.push({ deviceSeam: k, share: Math.round(Math.min(k * W - b.left, b.right - k * W) / b.width * 100) });
     });
+  }
+  // creative assets are cropped per device: text and badges must stay inside the central safe area of their slide
+  if (window.__safe) {
+    const { x, y } = window.__safe;
+    for (const el of root.querySelectorAll('[data-fit], [data-badge]')) {
+      const s = el.closest('.slide')?.getBoundingClientRect(); if (!s) continue;
+      // captions: the text lines themselves (the box is wider than the words); badges: the badge box
+      let b = el.getBoundingClientRect();
+      if (el.matches('[data-fit]')) {
+        // text nodes only: a block's own rect spans the whole box
+        const ls = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n; (n = w.nextNode());) if (n.textContent.trim()) { const r = document.createRange(); r.selectNodeContents(n); ls.push(...[...r.getClientRects()].filter(l => l.width > 2)); }
+        if (ls.length) b = { left: Math.min(...ls.map(l => l.left)), right: Math.max(...ls.map(l => l.right)), top: Math.min(...ls.map(l => l.top)), bottom: Math.max(...ls.map(l => l.bottom)) };
+      }
+      const bad = b.left < s.left + s.width * x / 100 - 1 || b.right > s.right - s.width * x / 100 + 1
+        || b.top < s.top + s.height * y / 100 - 1 || b.bottom > s.bottom - s.height * y / 100 + 1;
+      if (bad) report.push({ id: el.dataset.id || el.dataset.badge, outside: true });
+    }
   }
   return report;
 };
@@ -546,13 +569,16 @@ async function toStoreImage(buf, file, w, h) {
 
 // ---------- main ----------
 async function main() {
+  // wrong format for a target (e.g. PNG-only creative assets): fail before launching Chrome
+  for (const t of STILL_TARGETS) { const e = checkTargetFormat(t, FORMAT); if (e) errors.push(e); }
+  if (errors.length) { for (const e of errors) console.log(`  ERROR ${e}`); process.exit(1); }
   fs.mkdirSync(path.join(OUT, '.build'), { recursive: true });
   const slides = (cfg.slides || []).filter((s) => !SLIDE_FILTER || SLIDE_FILTER.includes(s.id));
   if (!slides.length) throw new Error('No slides to render');
 
   // collect image metadata for every referenced raster screen (aspect drives auto frames + zoom)
   const allScreens = new Set();
-  for (const l of LOCALES) for (const t of TARGETS) for (const s of slides) {
+  for (const l of LOCALES) for (const t of STILL_TARGETS) for (const s of slides) {
     const sp = specialize(s, t, l);
     for (const src of [sp.screen, sp.screen2, ...(sp.elements || []).map((e) => e.screen)]) {
       if (!src) continue;
@@ -567,7 +593,7 @@ async function main() {
 
   const buildSheets = () => {
   const sheets = [];
-  for (const target of TARGETS) for (const locale of LOCALES) {
+  for (const target of STILL_TARGETS) for (const locale of LOCALES) {
     const W = target.w, H = target.h;
     const pano = !target.raw && cfg.panorama && (cfg.panorama === true || cfg.panorama.targets?.includes(target.baseId) || (!cfg.panorama.targets && cfg.panorama.enabled !== false));
     const groups = pano ? [slides] : slides.map((s) => [s]);
@@ -607,7 +633,7 @@ async function main() {
         body += elementHtml(e, { W, H, n: group.length, slideId: 'panorama', theme, model: target.model }, locale);
       });
       // freeze font list for this sheet
-      const html = pageHtml({ locale, W: W * group.length, H, h: H, panorama: pano, slideW: W, n: group.length, body });
+      const html = pageHtml({ locale, W: W * group.length, H, h: H, panorama: pano, slideW: W, n: group.length, body, safe: target.family === 'creative' ? { x: 10, y: 10 } : null });
       sheets.push({ target, locale, group, html, W, H });
     }
   }
@@ -652,6 +678,7 @@ async function main() {
     for (const f of fit) {
       if (f.seam) { warn(`[${sh.target.id}/${sh.locale}] caption touches seam ${f.seam}|${f.seam + 1}: ${f.id} — the store's card gap will cut it; keep text ≥6% from slide edges`); continue; }
       if (f.deviceSeam) { notes.push(`[${sh.target.id}/${sh.locale}] a device crosses seam ${f.deviceSeam}|${f.deviceSeam + 1} (${f.share}% on the smaller side) — check the store view preview`); continue; }
+      if (f.outside) { warn(`[${sh.target.id}/${sh.locale}] caption leaves the safe area: ${f.id} — Apple crops creative assets per device; keep text inside the central 80%`); continue; }
       if (f.covered) { warn(`[${sh.target.id}/${sh.locale}] text is covered by a device or image: ${f.id} — move one of them`); continue; }
       if (f.overflow) errors.push(`[${sh.target.id}/${sh.locale}] text overflows its box even at 50%: ${f.id} — shorten the copy or enlarge h/w`);
       else if (f.scale < 0.9) warn(`[${sh.target.id}/${sh.locale}] text shrunk to ${Math.round(f.scale * 100)}%: ${f.id} — consider shorter copy`);
@@ -674,16 +701,16 @@ async function main() {
   const byKey = {};
   for (const m of manifest) {
     const meta = await sharp(m.file).metadata();
-    const t = TARGETS.find((x) => x.id === m.target);
+    const t = STILL_TARGETS.find((x) => x.id === m.target);
     if (meta.width !== t.w || meta.height !== t.h) errors.push(`${m.file}: ${meta.width}x${meta.height}, expected ${t.w}x${t.h}`);
     if (meta.hasAlpha) errors.push(`${m.file}: has alpha channel`);
-    const mb = t.store === 'msstore' ? 50 : 8;
+    const mb = t.maxMB ?? (t.store === 'msstore' ? 50 : 8);
     if (fs.statSync(m.file).size > mb * 1024 * 1024) warn(`${m.file}: larger than ${mb} MB`);
     if (t.store === 'msstore' && !/\.png$/i.test(m.file)) errors.push(`${m.file}: Microsoft Store needs PNG — use --format png`);
     (byKey[`${m.target}|${m.locale}`] ||= []).push(m);
   }
   for (const [k, arr] of Object.entries(byKey)) {
-    const t = TARGETS.find((x) => x.id === k.split('|')[0]);
+    const t = STILL_TARGETS.find((x) => x.id === k.split('|')[0]);
     if (arr.length > t.max) errors.push(`${k}: ${arr.length} screenshots, store max is ${t.max}`);
     if (t.min && arr.length < t.min) warn(`${k}: ${arr.length} screenshots, store minimum is ${t.min}`);
   }
@@ -691,9 +718,12 @@ async function main() {
   // ---------- fastlane layout (deliver / supply) ----------
   if (has('fastlane') || cfg.fastlane) {
     for (const m of manifest) {
-      const t = TARGETS.find((x) => x.id === m.target);
+      const t = STILL_TARGETS.find((x) => x.id === m.target);
       let dest;
-      if (t.store === 'ios') dest = path.join(OUT, 'fastlane', 'screenshots', storeLocale(m.locale, 'ios'), `${String(m.index).padStart(2, '0')}_${t.baseId}_${m.slide}.png`);
+      if (t.family === 'creative') {
+        dest = path.join(OUT, 'fastlane', 'creative', storeLocale(m.locale, 'ios'), `${t.baseId}_${m.slide}${path.extname(m.file)}`);
+        notes.push('creative assets (header, search, events) are not uploaded by deliver — add them in App Store Connect');
+      } else if (t.store === 'ios') dest = path.join(OUT, 'fastlane', 'screenshots', storeLocale(m.locale, 'ios'), `${String(m.index).padStart(2, '0')}_${t.baseId}_${m.slide}.png`);
       else if (t.store === 'play') {
         const base = path.join(OUT, 'fastlane', 'metadata', 'android', storeLocale(m.locale, 'play'), 'images');
         dest = t.playDir === 'featureGraphic' ? path.join(base, 'featureGraphic.png') : path.join(base, t.playDir, `${m.index}_${m.locale}.png`);
@@ -719,7 +749,7 @@ async function main() {
       const name = `${k.replace('|', '__').replace('@', '_')}.jpg`;
       await sharp({ create: { width, height, channels: 3, background: '#d9d9de' } }).composite(comps).jpeg({ quality: 88 }).toFile(path.join(pdir, name));
       // gallery page (for humans): full-resolution files, click to open
-      const t = TARGETS.find((x) => x.id === k.split('|')[0]);
+      const t = STILL_TARGETS.find((x) => x.id === k.split('|')[0]);
       const figs = arr.map((m) => { const rel = path.relative(OUT, m.file); return `<figure><a href="${esc(rel)}" target="_blank"><img src="${esc(rel)}" loading="lazy"></a><figcaption><b>${String(m.index).padStart(2, '0')} · ${esc(m.slide)}</b><span>${esc(m.layout)}</span></figcaption></figure>`; }).join('');
       // panorama sets also get a seamless strip so the joined design can be judged as one image
       let strip = '';
@@ -756,7 +786,7 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
 
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ generated: new Date().toISOString(), files: manifest.map((m) => ({ ...m, file: path.relative(OUT, m.file) })), warnings, errors }, null, 2));
   console.log(`Rendered ${manifest.length} screenshots → ${OUT}`);
-  console.log(`  targets: ${TARGETS.map((t) => t.id).join(', ')} | locales: ${LOCALES.join(', ')} | slides: ${slides.length}`);
+  console.log(`  targets: ${STILL_TARGETS.map((t) => t.id).join(', ')} | locales: ${LOCALES.join(', ')} | slides: ${slides.length}`);
   if (!has('no-preview')) console.log(`  previews: ${path.join(OUT, '_preview')} (open ${path.join(OUT, 'index.html')})`);
   for (const nt of [...new Set(notes)]) console.log(`  NOTE  ${nt}`);
   for (const w of [...new Set(warnings)]) console.log(`  WARN  ${w}`);

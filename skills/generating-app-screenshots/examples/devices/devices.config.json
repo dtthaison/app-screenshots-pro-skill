@@ -25,7 +25,11 @@
     "windows",
     "watch-ultra",
     "watch-ultra@styled",
-    "wear-os"
+    "wear-os",
+    "app-header",
+    "search-asset",
+    "event-card",
+    "event-details"
   ],
   "output": "out",
   "format": "png",
@@ -59,7 +63,10 @@
       "device": {
         "model": "iphone-notch",
         "color": "midnight"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "android",
@@ -74,7 +81,10 @@
       "device": {
         "model": "android",
         "color": "obsidian"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "android-flat",
@@ -89,7 +99,10 @@
       "device": {
         "model": "android-flat",
         "color": "porcelain"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "phone-watch",
@@ -105,7 +118,10 @@
       "watch": {
         "color": "natural-titanium",
         "band": "#f97316"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "phone-wear",
@@ -126,7 +142,10 @@
       "watch": {
         "color": "#2b2d33",
         "band": "#3f6b5e"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "watch-hero",
@@ -140,7 +159,10 @@
       "device": {
         "color": "#222226",
         "band": "#e8dccb"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "wear-hero",
@@ -155,7 +177,10 @@
       "device": {
         "color": "#d9d4cc",
         "band": "#a78bfa"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "laptop-phone",
@@ -170,7 +195,10 @@
       "screen2": "screens/desktop.html?state=full",
       "device2": {
         "color": "silver"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "android-tablet",
@@ -184,7 +212,10 @@
       "screen": "screens/desktop.html?theme=light",
       "device": {
         "color": "#2b2d33"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "macbook",
@@ -198,7 +229,10 @@
       "screen": "screens/desktop.html?state=full",
       "device": {
         "color": "silver"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "mac-window",
@@ -213,7 +247,10 @@
         "model": "mac-window",
         "title": "Streakly",
         "chrome": "dark"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "browser",
@@ -228,7 +265,10 @@
       "device": {
         "model": "browser",
         "url": "app.streakly.com"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "monitor",
@@ -242,7 +282,10 @@
       "device": {
         "model": "desktop",
         "color": "silver"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "windows",
@@ -258,7 +301,10 @@
         "title": "Streakly",
         "icon": "🔥",
         "chrome": "dark"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "windows-light",
@@ -274,7 +320,10 @@
         "title": "Streakly",
         "icon": "🔥",
         "chrome": "light"
-      }
+      },
+      "skipTargets": [
+        "creative"
+      ]
     },
     {
       "id": "watch-store",
@@ -288,6 +337,7 @@
         }
       },
       "skipTargets": [
+        "creative",
         "watch-ultra@styled"
       ]
     },
@@ -298,7 +348,35 @@
       ],
       "preset": "aurora",
       "title": "Your streak, **at a glance**",
-      "screen": "screens/watch.html"
+      "screen": "screens/watch.html",
+      "skipTargets": [
+        "creative"
+      ]
+    },
+    {
+      "id": "header",
+      "layout": "text-left",
+      "targets": [
+        "creative"
+      ],
+      "title": "Check off your day in **one tap**",
+      "screen": "../gallery/screens/home.html",
+      "skipTargets": [
+        "event-details"
+      ],
+      "caption": {
+        "x": 31,
+        "w": 40
+      }
+    },
+    {
+      "id": "event",
+      "layout": "hero",
+      "targets": [
+        "event-details"
+      ],
+      "title": "Join the 30-day streak challenge",
+      "screen": "../gallery/screens/home.html"
     }
   ]
 }
