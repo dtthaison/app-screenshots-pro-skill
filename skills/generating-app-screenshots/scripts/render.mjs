@@ -9,10 +9,11 @@ import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { chromium } from 'playwright-core';
 import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
-import { renderDevice, MODELS, kindOf } from './devices.mjs';
+import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
+import { buildTimeline, stateAt, findFfmpeg, probeClip, clipKey, extractClip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
 const argv = process.argv.slice(2);
@@ -48,6 +49,8 @@ function layer(base, top) {
 }
 const theme = (() => { const { preset, ...rest } = cfg.theme || {}; return layer(presetTheme(preset), rest); })();
 const SUPERSAMPLE = Number(flag('supersample', cfg.supersample ?? 2));
+// app previews render at 1x by default (capture speed); clips are extracted at the screen height this gives
+const VIDEO_SCALE = Number(flag('supersample', cfg.videoSupersample ?? 1));
 const warnings = [];
 const notes = [];
 const errors = [];
@@ -192,13 +195,16 @@ function backgroundHtml(bg, Wpx, Hpx) {
 
 // ---------- screens: images, {locale} templating, html mock screens ----------
 const imageMeta = new Map();
-const htmlQueue = new Map(); // out -> { file, locale, out, vw, vh }
+const htmlQueue = new Map(); // out -> { file, locale, out, vw, vh, query, fullPage }
 const htmlDone = new Set();
-function resolveScreen(src0, locale, model, landscape) {
+// {locale} candidates in lookup order: the locale, its language, the default locale
+const screenCands = (src, locale) => [locale, locale.split('-')[0], defaultLocale].map((l) => ({ file: src.replaceAll('{locale}', l), locale: l }));
+// fullPage: an html mock is captured at its whole scroll height (for motion: "scroll" in previews)
+function resolveScreen(src0, locale, model, landscape, { fullPage = false } = {}) {
   if (!src0) return null;
   // "screens/stats.html?state=before" — the query is passed to html mock screens
   const [src, query = ''] = src0.split('?');
-  const cand = [src.replaceAll('{locale}', locale), src.replaceAll('{locale}', locale.split('-')[0]), src.replaceAll('{locale}', defaultLocale)];
+  const cand = screenCands(src, locale).map((c) => c.file);
   const found = cand.find((c) => fs.existsSync(abs(c)));
   if (!found) { errors.push(`screen not found: ${src} (locale ${locale})`); return null; }
   if (found !== cand[0] && src.includes('{locale}')) warn(`[${locale}] no localized screen for ${src} — using ${found}`);
@@ -208,8 +214,8 @@ function resolveScreen(src0, locale, model, landscape) {
     let [vw, vh] = m.viewport || [440, 956];
     if (landscape) [vw, vh] = [vh, vw];
     const tag = query ? `.${query.replace(/[^a-z0-9]+/gi, '_')}` : '';
-    const out = path.join(OUT, '.build', 'screens', `${path.basename(found, path.extname(found))}${tag}.${locale}.${vw}x${vh}.png`);
-    if (!htmlDone.has(out)) htmlQueue.set(out, { file: abs(found), locale, out, vw, vh, query });
+    const out = path.join(OUT, '.build', 'screens', `${path.basename(found, path.extname(found))}${tag}${fullPage ? '.full' : ''}.${locale}.${vw}x${vh}.png`);
+    if (!htmlDone.has(out)) htmlQueue.set(out, { file: abs(found), locale, out, vw, vh, query, ...(fullPage ? { fullPage } : {}) });
     return out;
   }
   return abs(found);
@@ -259,7 +265,7 @@ function elementHtml(el, ctx, locale) {
   switch (el.type) {
     case 'caption': return captionHtml(el, ctx, locale);
     case 'device': {
-      const src = resolveScreen(el.screen, locale, el.screenModel || el.model, el.landscape);
+      const src = resolveScreen(el.screen, locale, el.screenModel || el.model, el.landscape, { fullPage: !!el.fullPage });
       const meta = src ? imageMeta.get(src) : null;
       return renderDevice({ ...el, src: src ? pathToFileURL(src).href : null, imageAspect: meta?.aspect }, ctx);
     }
@@ -414,12 +420,13 @@ function elementHtml(el, ctx, locale) {
 }
 
 // ---------- slide assembly ----------
-function slideTheme(s) {
-  return s.preset ? layer(theme, presetTheme(s.preset)) : theme;
+function slideTheme(s, base = theme) {
+  return s.preset ? layer(base, presetTheme(s.preset)) : base;
 }
-function slideElements(slide, target, locale, W, H) {
+// baseTheme: the theme to start from (a preview's own `theme` layered over cfg.theme)
+function slideElements(slide, target, locale, W, H, baseTheme = theme) {
   const s = specialize(slide, target, locale);
-  const th = slideTheme(s);
+  const th = slideTheme(s, baseTheme);
   if (target.raw) {
     // store rules (Wear OS, Apple Watch) want the app UI only: no frame, caption or background
     return { s: { ...s, background: '#000' }, th, els: [{ type: 'device', id: 'screen', model: 'none', style: 'frameless', screenModel: target.model, screen: s.screen,
@@ -464,6 +471,178 @@ function autoModel(e, target, locale) {
   if (a < 1.45) return play ? 'android-tablet' : 'ipad';
   if (a < 1.85) return play ? 'android-tablet' : 'iphone-home';
   return play ? 'android' : 'iphone';
+}
+
+// ---------- previews (video) ----------
+// One page per preview × video target × locale with every scene's DOM stacked (later scenes paint above), each in
+// its own .slide so __fit's safe-area check measures it. Node computes stateAt(tl, t); window.__apply(state) shows it.
+const isClip = (p) => /\.(mov|mp4|m4v|webm)$/i.test(p);
+// elementHtml's default z-index per type: each element sits in an animated wrapper (a stacking context), so the
+// wrapper takes the element's z and the layering matches the still slide
+const TYPE_Z = { caption: 3, device: 2, arrow: 5, band: 1, ribbon: 1, callout: 8 };
+
+async function loadImageMeta(srcs, locale) {
+  for (const src of srcs) {
+    if (typeof src !== 'string') continue;
+    for (const { file } of screenCands(src.split('?')[0], locale)) {
+      const p = abs(file);
+      if (imageMeta.has(p) || /\.html?$/i.test(p) || isClip(p) || !fs.existsSync(p)) continue;
+      const m = await sharp(p).metadata();
+      imageMeta.set(p, { w: m.width, h: m.height, aspect: m.height / m.width });
+    }
+  }
+}
+
+// -> [{ preview, target, locale, W, H, scenes: [{ scene, s, th, els, clip, overflow, labelEls }], timeline, warnings: Set }]
+async function resolvePreviews({ ffmpeg }) {
+  const jobs = [], vdef = theme.video || {};
+  for (const p0 of [cfg.previews ?? []].flat()) for (const target of TARGETS.filter((t) => isVideoTarget(t) && slideOn(p0, t))) for (const locale of LOCALES) {
+    const W = target.w, H = target.h, warnSet = new Set();
+    const preview = { transition: vdef.transition, ...specialize(p0, target, locale) };
+    const tag = `${target.id}/${locale}/${preview.id}`;
+    let list;
+    try { list = selectScenes(p0.scenes, preview.scenes); } catch (e) { errors.push(`[${tag}] ${e.message}`); continue; }
+    const { preset, ...pt } = preview.theme || {};
+    const base = preview.theme ? layer(layer(theme, presetTheme(preset)), pt) : theme;
+    const scenes = [];
+    for (const sc0 of list.filter((x) => slideOn(x, target))) {
+      const sp = specialize(sc0, target, locale);
+      const scene = { ...sp, in: sp.in ?? preview.in ?? vdef.entrance, scroll: merge(merge(vdef.scroll, preview.scroll), sp.scroll) };
+      // timed labels are objects; before-after keeps its string labels for the layout
+      const timed = (scene.labels || []).filter(isObj);
+      try {
+        // a clip resolves {locale} like a screen; its probed aspect picks the frame (autoModel) via imageMeta
+        let info = null;
+        const src = String(scene.screen ?? '').split('?')[0];
+        const hit = isClip(src) && screenCands(src, locale).find((c) => fs.existsSync(abs(c.file)));
+        if (hit) {
+          const w = missingClipWarning(locale, src.includes('{locale}') ? hit.locale : locale, preview.clipLocale);
+          if (w) warnSet.add(w);
+          info = { file: abs(hit.file), ...probeClip(ffmpeg, abs(hit.file)) };
+          imageMeta.set(info.file, { w: info.width, h: info.height, aspect: info.height / info.width });
+          scene.screen = info.file;
+        }
+        await loadImageMeta([scene.screen, scene.screen2, scene.screen3, ...(scene.elements || []).map((e) => e.screen)], locale);
+        const { s, th, els } = slideElements({ ...scene, labels: timed.length ? undefined : scene.labels }, target, locale, W, H, base);
+        const dev = els.find((e) => e.type === 'device' && e.id === 'device');
+        let clip = null, overflow = 0;
+        if (info && dev) {
+          const dur = Number.isFinite(scene.duration) ? scene.duration : DEFAULT_DURATION;
+          const { start = 0, speed = 1 } = scene.clip || {};
+          // cut at clip.end or the scene end, whichever comes first
+          const end = Math.min(scene.clip?.end ?? Infinity, info.duration, start + dur * speed);
+          const height = Math.round(screenRect(dev, { W, H }).height * VIDEO_SCALE);
+          const key = clipKey({ file: info.file, start, end, speed, height });
+          const ex = extractClip(ffmpeg, { file: info.file, start, end, speed, height, dir: path.join(OUT, '.build', 'clips', key) });
+          const rel = path.relative(BASE, info.file);
+          if (!ex.count) throw new Error(`clip ${rel} gave no frames between ${start}s and ${end}s`);
+          if (ex.count / ex.fps < dur - 1 / ex.fps) warnSet.add(`clip ${rel} is ${(ex.count / ex.fps).toFixed(1)}s but scene "${scene.id}" lasts ${dur}s — the last frame holds`);
+          const ms = MODELS[dev.model]?.screen, want = ms && (dev.landscape ? 1 / ms : ms);
+          if (want && Math.abs(info.height / info.width / want - 1) > 0.02) warnSet.add(`clip ${info.width}×${info.height} does not match the ${dev.model} screen (${want.toFixed(2)}:1) — it will be cropped`);
+          dev.screen = ex.files[0];
+          dev.clipFrames = ex.files.map(fileUrl);
+          imageMeta.set(ex.files[0], imageMeta.get(info.file));
+          clip = { frames: ex.count, fps: ex.fps };
+        } else if (scene.motion === 'scroll' && dev) {
+          // the whole mock / long capture pans inside the screen; overflow = how much taller than the screen it is
+          dev.fullPage = true;
+          const full = resolveScreen(dev.screen, locale, dev.screenModel || dev.model, dev.landscape, { fullPage: true });
+          const a = full && imageMeta.get(full)?.aspect, ms = MODELS[dev.model]?.screen;
+          overflow = a && ms ? a / ms - 1 : 0;
+        }
+        // labels: badges under the caption (above a bottom caption), faded in and out by the timeline
+        const cap = els.find((e) => e.type === 'caption');
+        const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: 50,
+          y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
+        scenes.push({ scene: { ...scene, labels: timed }, s, th, els, clip, overflow, labelEls });
+      } catch (e) { errors.push(`[${tag}/${scene.id}] ${e.message}`); }
+    }
+    if (!scenes.length) { errors.push(`[${tag}] no scenes to render for this target`); continue; }
+    const timeline = buildTimeline(preview, scenes.map((e) => ({ ...e.scene, clip: e.clip || undefined, overflow: e.overflow })), { fps: target.video.fps });
+    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet });
+  }
+  return jobs;
+}
+
+// resolving and building the pages discovers html mocks (incl. full-page ones for scroll, and zoom screens that only
+// elementHtml asks for); render them, then resolve again with their real size — as buildSheets does for stills
+async function previewJobs(browser, { ffmpeg }) {
+  const e0 = errors.length, w0 = warnings.length;
+  let jobs = await resolvePreviews({ ffmpeg });
+  jobs.forEach(previewPage);
+  if (htmlQueue.size) {
+    await renderMocks(browser);
+    htmlQueue.clear(); errors.length = e0; warnings.length = w0;
+    jobs = await resolvePreviews({ ffmpeg });
+  }
+  return jobs;
+}
+
+function sceneHtml(job, { s, th, els, labelEls }, i) {
+  const { W, H, locale } = job;
+  const ctx = { W, H, slideId: s.id, theme: th, model: job.target.model };
+  const bg = s.background ?? th.background;
+  // fade-through and the loop fades go to the scene's background colour
+  const veil = isObj(bg) && bg.color ? bg.color : typeof bg === 'string' && !/gradient|url\(/i.test(bg) ? bg : '#000';
+  const wrap = (e, n) => {
+    const role = e.role || (e.type === 'device' ? 'device' : e.type === 'caption' ? 'caption' : 'other');
+    return `<div class="anim" data-role="${role}" data-i="${role === 'label' ? e.i : n}" style="position:absolute;inset:0;z-index:${e.z ?? TYPE_Z[e.type] ?? 4}">${elementHtml(e, ctx, locale)}</div>`;
+  };
+  return `<div class="scene" data-scene="${esc(s.id)}" data-n="${i}" style="position:absolute;inset:0;visibility:hidden;opacity:0">${backgroundHtml(bg, W, H)}${[...els, ...labelEls].map(wrap).join('')}<div class="veil" style="position:absolute;inset:0;background:${veil};opacity:0;z-index:9999"></div></div>`;
+}
+
+// Runs in the page (serialized with toString): show one stateAt() result; resolves once changed clip frames are decoded.
+async function applyState(state) {
+  const H = window.innerHeight, changed = [];
+  for (const sc of state.scenes) {
+    const root = document.querySelector(`.scene[data-scene="${CSS.escape(sc.id)}"]`);
+    if (!root) continue;
+    root.style.visibility = sc.visible ? 'visible' : 'hidden';
+    root.style.opacity = sc.opacity;
+    root.style.transform = `translateX(${sc.tx * 100}%)`;
+    for (const role of ['device', 'caption']) {
+      for (const a of root.querySelectorAll(`:scope > .anim[data-role="${role}"]`)) { a.style.opacity = sc[role].opacity; a.style.transform = `translateY(${sc[role].dy * H}px)`; }
+    }
+    sc.labels.forEach((l, k) => { const a = root.querySelector(`:scope > .anim[data-role="label"][data-i="${k}"]`); if (a) a.style.opacity = l.opacity; });
+    const img = root.querySelector('[data-el="device"] .scr');
+    if (img) {
+      img.dataset.t0 ??= img.style.transform;          // landscape screens keep their rotation
+      img.style.transform = `${img.dataset.t0} scale(${sc.screen.scale})`.trim();
+      img.style.transformOrigin = 'center';
+      img.style.objectPosition = `50% ${sc.screen.scrollY * 100}%`;
+      const frames = window.__clips[sc.id];
+      if (frames && sc.screen.frame != null && img.dataset.f !== String(sc.screen.frame)) {
+        img.dataset.f = sc.screen.frame; img.src = frames[sc.screen.frame]; changed.push(img);
+      }
+    }
+    const veil = root.querySelector(':scope > .veil');
+    if (veil) veil.style.opacity = sc.veil;
+  }
+  await Promise.all(changed.map((i) => i.decode().catch(() => {})));
+}
+
+// pageHtml (fonts, __fit) + the stacked scenes + __apply; __timeline is there for debugging in a browser
+function previewPageHtml(job, bodies, { W, H, safe }) {
+  const json = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
+  const clips = Object.fromEntries(job.scenes.map((e) => [e.s.id, e.els.find((x) => x.type === 'device' && x.id === 'device')?.clipFrames]).filter(([, f]) => f));
+  const body = bodies.map((b) => `<div class="slide" style="left:0;width:${W}px">${b}</div>`).join('')
+    + `<script>window.__clips = ${json(clips)};\nwindow.__timeline = ${json(job.timeline)};\nwindow.__apply = ${applyState.toString()};</script>`;
+  return pageHtml({ locale: job.locale, W, H, h: H, panorama: false, body, safe });
+}
+
+function previewPage(job) {
+  fontFaces.length = 0; googleFamilies.clear();
+  const bodies = job.scenes.map((e, i) => sceneHtml(job, e, i));
+  return previewPageHtml(job, bodies, { W: job.W, H: job.H, safe: job.target.family === 'creative' ? { x: 10, y: 10 } : null });
+}
+
+// fit checks per scene at its middle (entrance done), with the same warnings as screenshots
+async function fitScenes(page, job) {
+  for (const sc of job.timeline.scenes) {
+    await page.evaluate((st) => window.__apply(st), stateAt(job.timeline, (sc.start + sc.end) / 2));
+    const fit = await page.evaluate((sel) => window.__fit(sel), `.scene[data-scene="${sc.id}"]`);
+    reportFit(fit, `${job.target.id}/${job.locale}/${job.preview.id}/${sc.id}`);
+  }
 }
 
 function pageHtml(sheet) {
@@ -568,8 +747,64 @@ async function toStoreImage(buf, file, w, h) {
   await img.toFile(file);
 }
 
+// pre-render html mock screens (queued by resolveScreen) to PNG at the device viewport, @3x
+async function renderMocks(browser) {
+  for (const job of htmlQueue.values()) {
+    const p = await browser.newPage({ viewport: { width: job.vw, height: job.vh }, deviceScaleFactor: 3, locale: job.locale });
+    await p.goto(`${pathToFileURL(job.file).href}?locale=${encodeURIComponent(job.locale)}${job.query ? `&${job.query}` : ''}`, { waitUntil: 'networkidle' }).catch(() => {});
+    await p.evaluate(() => document.fonts.ready);
+    fs.mkdirSync(path.dirname(job.out), { recursive: true });
+    await p.screenshot({ path: job.out, fullPage: job.fullPage });
+    await p.close();
+    const m = await sharp(job.out).metadata();
+    imageMeta.set(job.out, { w: m.width, h: m.height, aspect: m.height / m.width });
+    htmlDone.add(job.out);
+  }
+}
+
+// __fit() report -> warnings / errors, tagged with where it happened ("ios-6.9/en-US")
+function reportFit(fit, tag) {
+  for (const f of fit) {
+    if (f.seam) { warn(`[${tag}] caption touches seam ${f.seam}|${f.seam + 1}: ${f.id} — the store's card gap will cut it; keep text ≥6% from slide edges`); continue; }
+    if (f.deviceSeam) { notes.push(`[${tag}] a device crosses seam ${f.deviceSeam}|${f.deviceSeam + 1} (${f.share}% on the smaller side) — check the store view preview`); continue; }
+    if (f.outside) { warn(`[${tag}] caption leaves the safe area: ${f.id} — Apple crops creative assets per device; keep text inside the central 80%`); continue; }
+    if (f.covered) { warn(`[${tag}] text is covered by a device or image: ${f.id} — move one of them`); continue; }
+    if (f.overflow) errors.push(`[${tag}] text overflows its box even at 50%: ${f.id} — shorten the copy or enlarge h/w`);
+    else if (f.scale < 0.9) warn(`[${tag}] text shrunk to ${Math.round(f.scale * 100)}%: ${f.id} — consider shorter copy`);
+  }
+}
+
 // ---------- main ----------
 async function main() {
+  // TEMPORARY (Task 5): --only-previews builds the preview pages and runs their fit checks; Task 6 replaces this
+  // block with the preview pass (capture, encode, poster).
+  if (has('only-previews')) {
+    fs.mkdirSync(path.join(OUT, '.build'), { recursive: true });
+    let ffmpeg = null;
+    try { ffmpeg = findFfmpeg(); } catch (e) { errors.push(e.message); }
+    if (!ffmpeg && !errors.length) errors.push('previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg');
+    if (ffmpeg) {
+      const browser = await launch();
+      const jobs = await previewJobs(browser, { ffmpeg });
+      const page = await browser.newPage({ deviceScaleFactor: VIDEO_SCALE });
+      for (const job of jobs) {
+        const tag = `${job.target.id}/${job.locale}/${job.preview.id}`;
+        const file = path.join(OUT, '.build', `preview.${job.target.id.replace('@', '_')}.${job.locale}.${job.preview.id}.html`);
+        fs.writeFileSync(file, previewPage(job));
+        await page.setViewportSize({ width: job.W, height: job.H });
+        await page.goto(pathToFileURL(file).href, { waitUntil: 'networkidle', timeout: 60000 }).catch((e) => warn(`load: ${e.message}`));
+        await fitScenes(page, job);
+        for (const w of job.warnings) warn(`[${tag}] ${w}`);
+        for (const e of job.timeline.errors) errors.push(`[${tag}] ${e}`);
+        console.log(`  page: ${file} (${job.timeline.total}s, ${job.scenes.length} scenes)`);
+      }
+      await browser.close();
+    }
+    for (const nt of [...new Set(notes)]) console.log(`  NOTE  ${nt}`);
+    for (const w of [...new Set(warnings)]) console.log(`  WARN  ${w}`);
+    for (const e of [...new Set(errors)]) console.log(`  ERROR ${e}`);
+    process.exit(errors.length ? 1 : 0);
+  }
   // wrong format for a target (e.g. PNG-only creative assets): fail before launching Chrome
   for (const t of STILL_TARGETS) { const e = checkTargetFormat(t, FORMAT); if (e) errors.push(e); }
   if (errors.length) { for (const e of errors) console.log(`  ERROR ${e}`); process.exit(1); }
@@ -649,18 +884,7 @@ async function main() {
   const pages = {};
   const pageFor = async (scale) => (pages[scale] ||= await browser.newPage({ deviceScaleFactor: scale }));
 
-  // pre-render html mock screens
-  for (const job of htmlQueue.values()) {
-    const p = await browser.newPage({ viewport: { width: job.vw, height: job.vh }, deviceScaleFactor: 3, locale: job.locale });
-    await p.goto(`${pathToFileURL(job.file).href}?locale=${encodeURIComponent(job.locale)}${job.query ? `&${job.query}` : ''}`, { waitUntil: 'networkidle' }).catch(() => {});
-    await p.evaluate(() => document.fonts.ready);
-    fs.mkdirSync(path.dirname(job.out), { recursive: true });
-    await p.screenshot({ path: job.out });
-    await p.close();
-    const m = await sharp(job.out).metadata();
-    imageMeta.set(job.out, { w: m.width, h: m.height, aspect: m.height / m.width });
-    htmlDone.add(job.out);
-  }
+  await renderMocks(browser);
   if (htmlQueue.size) {
     htmlQueue.clear(); errors.length = 0; warnings.length = 0;
     sheets = buildSheets();
@@ -675,15 +899,7 @@ async function main() {
     const page = await pageFor(scale);
     await page.setViewportSize({ width: sh.W * sh.group.length, height: sh.H });
     await page.goto(pathToFileURL(file).href, { waitUntil: 'networkidle', timeout: 60000 }).catch((e) => warn(`load: ${e.message}`));
-    const fit = await page.evaluate(() => window.__fit());
-    for (const f of fit) {
-      if (f.seam) { warn(`[${sh.target.id}/${sh.locale}] caption touches seam ${f.seam}|${f.seam + 1}: ${f.id} — the store's card gap will cut it; keep text ≥6% from slide edges`); continue; }
-      if (f.deviceSeam) { notes.push(`[${sh.target.id}/${sh.locale}] a device crosses seam ${f.deviceSeam}|${f.deviceSeam + 1} (${f.share}% on the smaller side) — check the store view preview`); continue; }
-      if (f.outside) { warn(`[${sh.target.id}/${sh.locale}] caption leaves the safe area: ${f.id} — Apple crops creative assets per device; keep text inside the central 80%`); continue; }
-      if (f.covered) { warn(`[${sh.target.id}/${sh.locale}] text is covered by a device or image: ${f.id} — move one of them`); continue; }
-      if (f.overflow) errors.push(`[${sh.target.id}/${sh.locale}] text overflows its box even at 50%: ${f.id} — shorten the copy or enlarge h/w`);
-      else if (f.scale < 0.9) warn(`[${sh.target.id}/${sh.locale}] text shrunk to ${Math.round(f.scale * 100)}%: ${f.id} — consider shorter copy`);
-    }
+    reportFit(await page.evaluate(() => window.__fit()), `${sh.target.id}/${sh.locale}`);
     for (let i = 0; i < sh.group.length; i++) {
       const slide = sh.group[i];
       const key = `${sh.target.id}|${sh.locale}`;

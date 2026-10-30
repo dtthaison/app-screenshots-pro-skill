@@ -8,7 +8,8 @@ export const ENTRANCES = {
   fade: { device: 0.6, caption: 0.5, delay: 0.1, rise: 0 },
   none: null,
 };
-const DEFAULT_DURATION = 4, FADE_IN = 0.4, FADE_OUT = 0.6, LABEL_FADE = 0.3, DRIFT = 1.03, SCROLL_MIN = 0.02;
+export const DEFAULT_DURATION = 4;
+const FADE_IN = 0.4, FADE_OUT = 0.6, LABEL_FADE = 0.3, DRIFT = 1.03, SCROLL_MIN = 0.02;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (p) => 1 - (1 - clamp01(p)) ** 3;                 // ease-out cubic
@@ -130,6 +131,25 @@ export const timeCode = (s) => {
   const cs = Math.round(s * 100), p = (n) => String(n).padStart(2, '0');
   return `${p(Math.floor(cs / 360000))}:${p(Math.floor(cs / 6000) % 60)}:${p(Math.floor(cs / 100) % 60)}:${p(cs % 100)}`;
 };
+
+// byTarget.scenes: ["a", "b"] picks (and orders) the preview's own scenes by id; scene objects replace them.
+export function selectScenes(previewScenes = [], override) {
+  if (!Array.isArray(override) || !override.every((x) => typeof x === 'string')) return override ?? previewScenes;
+  return override.map((id) => {
+    const s = previewScenes.find((x) => x?.id === id);
+    if (!s) throw new Error(`unknown scene "${id}" (scenes: ${previewScenes.map((x) => x?.id).join(', ')})`);
+    return s;
+  });
+}
+
+// A recording resolved from another locale shows the wrong UI language, unless the author declared it
+// (`clipLocale` on the preview) or the file is the locale's own (locale or language level).
+export function missingClipWarning(locale, usedLocale, clipLocale) {
+  const lang = locale.split('-')[0];
+  if (usedLocale === locale || usedLocale === lang) return null;
+  if (clipLocale && [locale, lang, usedLocale].includes(clipLocale)) return null;
+  return `[${locale}] no recording for this locale — using ${usedLocale}; UI language in the recording does not match`;
+}
 
 // ---------- ffmpeg ----------
 // Everything below shells out to ffmpeg (found by findFfmpeg) and knows nothing about Chrome.
