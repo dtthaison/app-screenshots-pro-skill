@@ -7,10 +7,19 @@ import sharp from 'sharp';
 export const TAP_FX = {
   ripple: { dur: 0.6, r0: 0.03, r1: 0.12, a0: 0.5 },
   ring: { dur: 0.6, stroke: 3 },
-  spotlight: { in: 0.2, hold: 0.6, out: 0.3, radius: 0.18, dim: 0.25 },
+  spotlight: { in: 0.2, hold: 0.6, out: 0.3, radius: 0.09, dim: 0.25 },
   swipe: { extra: 0.3 },
 };
-export const TAP_STYLES = ['ripple', 'ring', 'spotlight'];
+export const TAP_STYLES = ['ripple', 'ring', 'spotlight', 'none'];
+export const SWIPE_DUR = 0.4;      // when a swipe event carries no dur
+
+// scene, then preview, then theme, then ripple. style: null for "none"; explicit: whether anything set it (a missing
+// sidecar is worth a NOTE only then). Throws on an unknown value.
+export function resolveTap(...levels) {
+  const explicit = levels.find((v) => v != null);
+  if (explicit != null && !TAP_STYLES.includes(explicit)) throw new Error(`unknown tap "${explicit}" (${TAP_STYLES.join(', ')})`);
+  return { explicit: explicit != null, style: explicit === 'none' ? null : explicit ?? 'ripple' };
+}
 
 export const sidecarPath = (mov) => mov.replace(/\.[^./\\]+$/, '') + '.taps.json';
 
@@ -64,7 +73,7 @@ export function markSpan(sidecar, from, to, fileDuration) {
   const start = from == null ? 0 : look(from);
   if (to != null) {
     const end = look(to);
-    if (!(end > start)) throw new Error(`mark "${to}" (${end}s) is not after "${from}" (${start}s)`);
+    if (!(end > start)) throw new Error(`mark "${to}" (${end}s) is not after "${from ?? 'start'}" (${start}s)`);
     return { start, end };
   }
   const next = Object.values(marks).filter((t) => t > start);
@@ -83,13 +92,13 @@ export function tapsInSpan(sidecar, start, end) {
   for (const e of sidecar.events) {
     if (!inSpan(e, start, end) || !num(e.x) || !num(e.y)) continue;
     if (e.kind === 'tap') out.push({ srcT: e.t, x: e.x, y: e.y, kind: 'tap', align: e.align });
-    else if (e.kind === 'swipe' && num(e.x2) && num(e.y2)) out.push({ srcT: e.t, x: e.x, y: e.y, kind: 'swipe', x2: e.x2, y2: e.y2, dur: e.dur ?? 0.4, align: e.align });
+    else if (e.kind === 'swipe' && num(e.x2) && num(e.y2)) out.push({ srcT: e.t, x: e.x, y: e.y, kind: 'swipe', x2: e.x2, y2: e.y2, dur: e.dur ?? SWIPE_DUR, align: e.align });
   }
   return out;
 }
 
 // 0..1 while the effect is on screen (linear in time over its whole life), otherwise -1. `at` and `t` share a clock.
-export function tapProgress(at, t, kind, style, dur = 0.4) {
+export function tapProgress(at, t, kind, style, dur = SWIPE_DUR) {
   const fx = TAP_FX;
   const len = kind === 'swipe' ? dur + fx.swipe.extra : style === 'spotlight' ? fx.spotlight.in + fx.spotlight.hold + fx.spotlight.out : fx[style]?.dur;
   if (!(len > 0)) return -1;
