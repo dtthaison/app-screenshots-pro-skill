@@ -23,6 +23,26 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
    or copy slides from `examples/gallery/layouts.config.json` (every layout × preset).
    Pick a brand-matching `theme.preset`; vary `preset`/`layout` per slide for rhythm.
    Add `previews` for a preview video (start from `examples/preview/`). It plays **first** on the store, so scene 1 and the poster carry the hook.
+
+   **Preview video from real footage** (App Store app previews; iPhone only in this release):
+   1. **Brief.** From the code write `preview-brief.json` next to the config: category, signals, moments (things that move, with how to reach each), and the owner's wishes (must-show, must-avoid, channels, tone, `disclose`). Ask the owner anything the code can't say. Fields: [config.md → Real footage previews](references/config.md#real-footage-previews); vocabulary: [concepts.md](references/video/concepts.md).
+   2. **Recommend:** `node <skill-dir>/scripts/recommend.mjs preview-brief.json` gives 3 picks (safe, strongest, bold).
+   3. **Tell the owner the 3 storylines in words**, no JSON, and let them choose. Don't reorder the ranking; you may note a disagreement.
+   4. **Storyboard.** The pick becomes a `previews[]` entry with `concept`, `record` and scenes (`full-screen` / `caption-band` / `end-card`, `moment`, `draft` stills). Run `node <skill-dir>/scripts/render.mjs <config> --check`; fix every ERROR and WARN. Start from `examples/preview-recorded/`.
+   5. **Record:** `node <skill-dir>/scripts/record.mjs <config> --preview <id> [--takes 3]` (needs Maestro 2.6+ and a booted simulator; setup and fallback: [reading-the-app.md §2b](references/reading-the-app.md)).
+   6. **Review `recordings/<locale>/<preview>.sheet.jpg`** (read the image). Do not render until none of these is true:
+      - [ ] personal data (names, emails, phone numbers) other than the seeded persona
+      - [ ] error states or toasts
+      - [ ] debug overlays, dev-client banners, "Preparing capture…" or other scaffolding screens
+      - [ ] the keyboard, unless it is the point
+      - [ ] spinners longer than 1 s that the speed ramp will not absorb
+      - [ ] text that appears pasted rather than typed
+      - [ ] the status bar is not 9:41
+
+      Fix by trimming with marks (`clip.from`/`to`), adding `wait`s, or re-taking. Never paint over the UI.
+   7. **Render and QA** (workflow steps 5–6), then **hand over** with `out/_preview/<id>.report.md` (workflow step 7).
+
+   Knowledge base, read when you need the reasons or the numbers: [concepts](references/video/concepts.md), [categories](references/video/categories.md), [store-rules](references/video/store-rules.md), [motion](references/video/motion.md), [sources](references/video/sources.md).
 5. **Render:**
    ```bash
    cd <skill-dir> && [ -d node_modules ] || npm install --no-fund --no-audit
@@ -40,7 +60,7 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
    - [ ] previews: read every `_preview/*__<id>.jpg` filmstrip; the poster frame reads alone; nothing moves at the loop point; clips are not stretched; labels are timed right in every locale
 7. **Deliver:** report the output folder, targets × locales, and what still needs a human:
    native-speaker review; **if HTML mocks were used, say real captures must replace them before App Store submission**;
-   for previews: the files, the poster time for App Store Connect, a draft notice when scenes are stills or mocks;
+   for previews: the files, the poster time for App Store Connect, a draft notice when scenes are stills or mocks, and the hand-over report `out/_preview/<id>.report.md` (what was cut, WARN and NOTE lines, what a human must still do: native-speaker caption review, accepting a network take, uploading);
    app bugs noticed in the code (e.g. broken plurals), reported, not baked into the screenshots.
    `--fastlane` writes `out/fastlane/` for `deliver` / `supply`: screenshots and app previews (`deliver` takes one `preview_frame_time_code` per upload, so give all previews the same poster time); creative assets go to `out/fastlane/creative/` for manual upload in App Store Connect. `out/.build/` is scratch.
 
@@ -64,6 +84,8 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
 | Preview videos | targets `preview-iphone` `preview-iphone-16-9` `preview-iphone-4.7` `preview-ipad` `preview-ipad-9.7` `preview-mac`: 15–30 s, max 3 per size and locale |
 | Creative assets | images `app-header` `search-asset` `event-card` `event-details` (+ `-16-9`, png only), videos `header-video` `search-video` `event-card-video` `event-details-video`: 1 per locale; wide slides need `"targets": ["creative"]` |
 | `previews` | `id targets music poster transition loop clipLocale byTarget scenes` — [config.md → previews](references/config.md#previews) |
+| Footage preview | `concept` (picks the checks), `record` (steps `open tap swipe type wait mark`), scene `clip: { from, to, speed: "auto" }`, `tap` (`ripple\|ring\|spotlight\|none`, default ripple), `captionMotion` (`rise\|words\|lines\|pop\|none`), `draft`, `moment`; `--check` — [config.md](references/config.md#real-footage-previews) |
+| Footage layouts | `full-screen` (recording edge to edge, scrim caption), `caption-band` (solid band, screen below), `end-card` (icon, name, tagline) |
 | Mock screen states | `"screen": "screens/stats.html?state=before"` (query reaches the mock) |
 
 ## Common mistakes

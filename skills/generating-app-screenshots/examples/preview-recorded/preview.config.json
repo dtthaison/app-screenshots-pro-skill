@@ -1,0 +1,35 @@
+{
+  "app": { "name": "Streakly", "icon": "icon.png" },
+  "defaultLocale": "en-US",
+  "locales": ["en-US"],
+  "targets": [{ "id": "clip-full", "w": 880, "h": 1912, "video": { "minSec": 1, "maxSec": 60 } }],
+  "output": "out",
+  "strings": "copy.json",
+  "theme": { "preset": "midnight", "font": { "family": "Plus Jakarta Sans" } },
+  "previews": [
+    {
+      "id": "recorded",
+      "poster": "progress",
+      "scenes": [
+        {
+          "id": "progress",
+          "moment": "progress",
+          "layout": "full-screen",
+          "title": "@progress.title",
+          "screen": "../preview/recordings/{locale}/walk.mp4",
+          "clip": { "from": "top", "to": "mid", "speed": "auto" },
+          "tap": "ripple",
+          "captionMotion": "words"
+        },
+        {
+          "id": "habits",
+          "layout": "caption-band",
+          "title": "@habits.title",
+          "screen": "../preview/recordings/{locale}/walk.mp4",
+          "clip": { "from": "mid", "speed": "auto" }
+        },
+        { "id": "end", "layout": "end-card", "title": "@end.title", "duration": 2 }
+      ]
+    }
+  ]
+}

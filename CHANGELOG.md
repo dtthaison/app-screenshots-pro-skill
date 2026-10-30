@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 (2026-10-31)
+
+- Real-footage app previews, iPhone only (`preview-iphone`): brief → recommend → storyboard → record → review → render → hand-over.
+  - `scripts/recommend.mjs` reads a `preview-brief.json` (signals, moments, the owner's wishes) and returns 3 storylines (safe, strongest, bold) from 11 concepts. The strongest pick always features the owner's must-show moment.
+  - `scripts/record.mjs` films a scripted take on the iOS Simulator with Maestro (2.6+): `record` steps `open`, `tap`, `swipe`, `type`, `wait`, `mark`. It writes `recordings/<locale>/<id>.mov`, a tap sidecar `.taps.json` (times found from reaction frames) and a `.sheet.jpg` contact sheet for review.
+  - `clip: { from, to }` cuts by mark names; `clip.speed: "auto"` ramps idle stretches (1× to 4×, taps stay at 1×).
+  - `tap` effects `ripple` (the default), `ring`, `spotlight`, `none`; `captionMotion` `rise`, `words`, `lines`, `pop`, `none`.
+  - Layouts `full-screen`, `caption-band` and `end-card`; scene fields `draft` (a still that stands in before the take) and `moment`.
+  - `render.mjs --check` validates a storyboard without capturing frames. New WARNs: hook timing, beat length, end card, reading time, device frames (2.3.4), prices; NOTEs for years and months, `owner.disclose`, window-timed taps and a missing sidecar.
+  - A hand-over report `out/_preview/<id>.report.md` per preview: beats, files, poster time, time cut, WARN and NOTE lines, what a human must still do.
+  - Knowledge base in `references/video/` (concepts, categories, store rules, motion, sources); the must-not-ship checklist is in SKILL.md.
+- Example `examples/preview-recorded` (`npm run example:preview-recorded`) renders without a simulator. `examples/preview/recordings/en-US/walk.taps.json` is a hand-written sidecar, so the `stats` scene of `examples/preview` (on `walk.mp4`) now shows tap ripples by default.
+- `examples/preview` shows one expected WARN for `preview-ipad`, `caption-band: the screen is only 50% of the canvas width`, because this release is iPhone-first.
+- `evals/evals.json`: 4 skill evals for the recommend and storyboard steps.
+- Docs: `references/reading-the-app.md` §2b is rewritten around `record.mjs` (moments, deep links, test IDs), and `references/config.md` documents every new field and message.
+
 ## 1.1.0 (2026-10-30)
 
 - Google Play: `android-tv` and `tv-banner` (supply uploads both), `android-xr` (3840×2400), `android-auto` / `android-auto-portrait` (raw system UI), and `play-promo`, a 1920×1080 video for the YouTube preview link.

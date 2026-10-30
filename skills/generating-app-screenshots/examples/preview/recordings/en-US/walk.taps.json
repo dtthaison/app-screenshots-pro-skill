@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "fps": 30,
+  "width": 880,
+  "height": 1912,
+  "device": "hand-written for the example",
+  "locale": "en-US",
+  "syncOffset": 0,
+  "events": [
+    { "t": 1.5, "kind": "tap", "x": 0.5, "y": 0.26, "w": 0.14, "h": 0.06, "step": 1, "align": "frame" },
+    { "t": 4.0, "kind": "tap", "x": 0.5, "y": 0.3, "w": 0.14, "h": 0.06, "step": 2, "align": "frame" }
+  ],
+  "marks": { "top": 0, "mid": 3 },
+  "takes": 1
+}
