@@ -17,7 +17,7 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (p) => 1 - (1 - clamp01(p)) ** 3;                 // ease-out cubic
 const prog = (t, from, len) => (len > 0 ? ease((t - from) / len) : t >= from ? 1 : 0);
 const entranceLen = (e) => (e ? e.delay + e.caption : 0);      // device (0.6) ends with the caption (0.1 + 0.5)
-const restLen = (s) => Math.max(entranceLen(ENTRANCES[s.entrance]), s.captionMotion === 'rise' ? 0 : (ENTRANCES[s.entrance]?.delay ?? 0) + motionLength(s.captionMotion, s.words));
+export const restLen = (s) => Math.max(entranceLen(ENTRANCES[s.entrance]), s.captionMotion === 'rise' ? 0 : (ENTRANCES[s.entrance]?.delay ?? 0) + motionLength(s.captionMotion, s.words));
 const ms = (x) => Math.round(x * 1000) / 1000;                 // 3 + 3.4 + 11.8 + 11.8 is 30.000000000000004 in floats
 const secs = (x) => `${+x.toFixed(2)}s`;                       // for messages: at most two decimals
 

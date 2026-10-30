@@ -20,7 +20,7 @@ import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kineti
 import { frameDiffs } from './align.mjs';
 import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from './ramp.mjs';
 import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, resolveTap } from './taps.mjs';
-import { storeChecks, iphoneOnly } from './storecheck.mjs';
+import { storeChecks, iphoneOnly, isStillImagePath } from './storecheck.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -561,7 +561,9 @@ async function resolvePreviews({ ffmpeg }) {
           scene.screen = info.file;
         } else if (isClip(src)) {
           // no recording yet: a draft still stands in, otherwise this is an error
-          if (!scene.draft) throw new Error(`recording ${path.relative(BASE, abs(screenCands(src, locale)[0].file))} not found — run: node scripts/record.mjs <config> --preview ${preview.id}`);
+          if (!scene.draft) throw new Error(`recording ${path.relative(BASE, abs(screenCands(src, locale)[0].file))} not found — run: node scripts/record.mjs ${path.relative(process.cwd(), path.resolve(configPath))} --preview ${preview.id}`);
+          const draftHit = typeof scene.draft === 'string' && isStillImagePath(scene.draft) && screenCands(scene.draft, locale).some((c) => fs.existsSync(abs(c.file)));
+          if (!draftHit) throw new Error(`draft ${scene.draft} for scene "${scene.id}" must be an existing still image`);
           scene.screen = scene.draft;
           drafts.push(scene.id);
         }
