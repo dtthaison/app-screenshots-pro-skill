@@ -11,13 +11,14 @@ import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { chromium } from 'playwright-core';
 import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
-import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
+import { renderDevice, screenRect, screenRadius, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
 import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kinetic.mjs';
 import { frameDiffs } from './align.mjs';
-import { idleRuns, rateCurve, frameMap, linearMap, fitMap } from './ramp.mjs';
+import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from './ramp.mjs';
+import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, TAP_STYLES } from './taps.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -559,14 +560,24 @@ async function resolvePreviews({ ffmpeg }) {
           : stillMeta(scene.screen, { cands: (f) => screenCands(f, locale), abs, exists: (f) => fs.existsSync(f), meta: imageMeta });
         const aspectMsg = shownMeta && screenAspectError(s.layout, shownMeta.w, shownMeta.h, W, H);
         if (aspectMsg) { if (s.layout === 'full-screen') throw new Error(aspectMsg); warnSet.add(aspectMsg); }
-        let clip = null, overflow = 0;
+        let clip = null, overflow = 0, tapList = [], tapStyleUsed = null;
         if (info && dev) {
           const dur = Number.isFinite(scene.duration) ? scene.duration : DEFAULT_DURATION;
-          const { start = 0, speed = 1 } = scene.clip || {};
+          const { speed = 1 } = scene.clip || {};
           const auto = speed === 'auto';
+          // clip.from / clip.to name marks in the recording's sidecar; they replace clip.start / clip.end
+          const named = scene.clip?.from != null || scene.clip?.to != null;
+          if (named && (scene.clip.start != null || scene.clip.end != null)) throw new Error('clip.from/to and clip.start/end cannot be combined — use one or the other');
+          const sidecar = readSidecar(info.file);
+          const tapStyle = scene.tap ?? preview.tap;
+          if (tapStyle != null && !TAP_STYLES.includes(tapStyle)) throw new Error(`unknown tap "${tapStyle}" (${TAP_STYLES.join(', ')})`);
+          if (named && !sidecar) throw new Error(`clip marks need ${path.relative(BASE, sidecarPath(info.file))} — record with record.mjs`);
+          if (tapStyle && !sidecar) notes.push('taps skipped: no sidecar');
+          const span = named ? markSpan(sidecar, scene.clip.from, scene.clip.to, info.duration) : { start: scene.clip?.start ?? 0, end: scene.clip?.end };
+          const start = span.start;
           if (!auto && !(typeof speed === 'number' && speed > 0)) throw new Error(`clip.speed must be a number above 0 or "auto" (got ${JSON.stringify(speed)})`);
           // always extract at 1x: the map picks the frames. A number cuts at clip.end or the scene end; "auto" takes the whole span
-          const end = auto ? Math.min(scene.clip?.end ?? info.duration, info.duration) : Math.min(scene.clip?.end ?? Infinity, info.duration, start + dur * speed);
+          const end = auto ? Math.min(span.end ?? info.duration, info.duration) : Math.min(span.end ?? Infinity, info.duration, start + dur * speed);
           const height = Math.round(screenRect(dev, { W, H }).height * VIDEO_SCALE);
           const key = clipKey({ file: info.file, start, end, speed: 1, height });
           const ex = extractClip(ffmpeg, { file: info.file, start, end, speed: 1, height, dir: path.join(OUT, '.build', 'clips', key) });
@@ -579,7 +590,8 @@ async function resolvePreviews({ ffmpeg }) {
             const cache = path.join(ex.dir, 'diffs.json');
             let diffs = fs.existsSync(cache) ? Float64Array.from(JSON.parse(fs.readFileSync(cache, 'utf8'))) : null;
             if (diffs?.length !== ex.count) { diffs = await frameDiffs(ex.files); fs.writeFileSync(cache, JSON.stringify([...diffs])); }
-            const idle = idleRuns(diffs, ex.fps), taps = [];   // taps: source frames, from the sidecar (Task 9)
+            // protected frames: taps and swipes of the sidecar, as source frames of this span
+            const idle = idleRuns(diffs, ex.fps), taps = sidecar ? activityInSpan(sidecar, start, end).map((t) => Math.round((t - start) * ex.fps)) : [];
             if (Number.isFinite(scene.duration)) map = fitMap(diffs, ex.fps, { taps, targetFrames: Math.round(dur * ex.fps), idle, scene: scene.id }).map;
             else { map = frameMap(rateCurve(ex.count, ex.fps, { idle, taps })); scene.duration = map.length / ex.fps; }
           }
@@ -592,6 +604,18 @@ async function resolvePreviews({ ffmpeg }) {
           dev.clipFrames = ex.files.map(fileUrl);
           imageMeta.set(ex.files[0], imageMeta.get(info.file));
           clip = { frames: map.length, fps: ex.fps, map };
+          // tap effects, in scene time: where the tap lands in the output after the ramp
+          if (sidecar && tapStyle) {
+            const accent = th.accent || '#ffcf5c';
+            tapList = [];
+            for (const e of tapsInSpan(sidecar, start, end)) {
+              const src = Math.min(ex.count - 1, Math.max(0, Math.round((e.srcT - start) * ex.fps)));
+              const at = outputFrame(map, src) / ex.fps;
+              if (e.align === 'window') notes.push(`tap at ${e.srcT.toFixed(2)}s was timed from the command window (may be early or late)`);
+              tapList.push({ at, x: e.x, y: e.y, kind: e.kind, ...(e.kind === 'swipe' && { x2: e.x2, y2: e.y2, dur: e.dur }), color: await tapColor(ex.files[src], e.x, e.y, accent) });
+            }
+            tapStyleUsed = tapStyle;
+          }
         } else if (scene.motion === 'scroll' && dev) {
           // the whole mock / long capture pans inside the screen; overflow = how much taller than the screen it is
           // measured against the aspect the device shows: its screenAspect, the model's screen, else (frameless, windows)
@@ -613,7 +637,7 @@ async function resolvePreviews({ ffmpeg }) {
         if (cap) { cap.motion = captionMotion; words = Math.max(1, wordCount(splitWords(capTitle))); }
         const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: cap?.x ?? 50, z: 6,
           y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
-        scenes.push({ scene: { ...scene, labels: timed, captionMotion, words }, s, th, els, clip, overflow, labelEls });
+        scenes.push({ scene: { ...scene, labels: timed, captionMotion, words, taps: tapList, tapStyle: tapStyleUsed }, s, th, els, clip, overflow, labelEls });
       } catch (e) { errors.push(`[${tag}/${scene.id}] ${e.message}`); }
     }
     if (!scenes.length) { errors.push(`[${tag}] no scenes to render for this target`); continue; }
@@ -644,6 +668,28 @@ async function previewJobs(browser, { ffmpeg }) {
   return jobs;
 }
 
+// Tap effects: a layer over the device's screen (clipped to its corners) with one child per tap, in tap order.
+// applyState moves them; here they are placed at the tap, hidden, with everything applyState needs in data-*.
+function tapsHtml(sc, dev, { W, H }) {
+  if (!sc?.taps.length || !sc.tapStyle || !dev) return '';
+  const r = screenRect(dev, { W, H }), fx = TAP_FX, f = (n) => Math.round(n * 100) / 100;
+  const kids = sc.taps.map((t) => {
+    const at = `data-kind="${t.kind}" data-x="${t.x}" data-y="${t.y}" data-x2="${t.x2 ?? ''}" data-y2="${t.y2 ?? ''}" data-dur="${t.dur ?? ''}"`;
+    const base = 'position:absolute;opacity:0;pointer-events:none;';
+    if (t.kind === 'swipe') {
+      const d = r.width * 0.08;
+      return `<div class="tap" ${at} style="${base}left:${f(t.x * r.width - d / 2)}px;top:${f(t.y * r.height - d / 2)}px;width:${f(d)}px;height:${f(d)}px;border-radius:50%;background:${t.color}"></div>`;
+    }
+    if (sc.tapStyle === 'spotlight') {
+      const R = fx.spotlight.radius * r.width;
+      return `<div class="tap" ${at} style="${base}inset:0;background:radial-gradient(circle at ${f(t.x * r.width)}px ${f(t.y * r.height)}px,transparent ${f(R)}px,rgba(0,0,0,${fx.spotlight.dim}) ${f(R + 1)}px)"></div>`;
+    }
+    const d = fx.ripple.r1 * 2 * r.width, paint = sc.tapStyle === 'ring' ? `border:${fx.ring.stroke}px solid ${t.color};box-sizing:border-box` : `background:${t.color}`;
+    return `<div class="tap" ${at} style="${base}left:${f(t.x * r.width - d / 2)}px;top:${f(t.y * r.height - d / 2)}px;width:${f(d)}px;height:${f(d)}px;border-radius:50%;${paint}"></div>`;
+  }).join('');
+  return `<div class="taps" data-style="${sc.tapStyle}" style="position:absolute;left:${f(r.left)}px;top:${f(r.top)}px;width:${f(r.width)}px;height:${f(r.height)}px;overflow:hidden;border-radius:${f(screenRadius(dev, { W, H }))}px;z-index:2;pointer-events:none">${kids}</div>`;
+}
+
 function sceneHtml(job, { s, th, els, labelEls }, i) {
   const { W, H, locale } = job;
   const ctx = { W, H, slideId: s.id, theme: th, model: job.target.model };
@@ -655,7 +701,7 @@ function sceneHtml(job, { s, th, els, labelEls }, i) {
     const z = role === 'other' ? '' : `;z-index:${e.z ?? ROLE_Z[role]}`;
     return `<div class="anim" data-role="${role}" data-i="${role === 'label' ? e.i : n}" style="position:absolute;inset:0${z}">${elementHtml(e, ctx, locale)}</div>`;
   };
-  return `<div class="scene" data-scene="${esc(s.id)}" data-n="${i}" style="position:absolute;inset:0;visibility:hidden;opacity:0">${backgroundHtml(bg, W, H)}${[...els, ...labelEls].map(wrap).join('')}<div class="veil" style="position:absolute;inset:0;background:${veil};opacity:0;z-index:9999"></div></div>`;
+  return `<div class="scene" data-scene="${esc(s.id)}" data-n="${i}" style="position:absolute;inset:0;visibility:hidden;opacity:0">${backgroundHtml(bg, W, H)}${[...els, ...labelEls].map(wrap).join('')}${tapsHtml(job.timeline.scenes[i], els.find((e) => e.type === 'device' && e.id === 'device'), { W, H })}<div class="veil" style="position:absolute;inset:0;background:${veil};opacity:0;z-index:9999"></div></div>`;
 }
 
 // Runs in the page (serialized with toString): show one stateAt() result; resolves once changed clip frames are decoded,
@@ -699,6 +745,31 @@ async function applyState(state) {
         img.dataset.f = sc.screen.frame; img.src = frames[sc.screen.frame]; changed.push(img);
       }
     }
+    // tap effects (progress p per tap, -1 when off); the easing is written out here because this function is serialized
+    const fxLayer = root.querySelector(':scope > .taps');
+    if (fxLayer) {
+      const fx = window.__tapfx, style = fxLayer.dataset.style, w = fxLayer.clientWidth;
+      fxLayer.querySelectorAll(':scope > .tap').forEach((el, i) => {
+        const p = sc.taps[i] ?? -1, d = el.dataset;
+        if (!(p >= 0)) { el.style.opacity = 0; return; }
+        const ease = 1 - 2 ** (-10 * p);                                  // expo-out
+        if (d.kind === 'swipe') {
+          const len = +d.dur + fx.swipe.extra, el_ = p * len, m = Math.min(1, el_ / +d.dur);
+          const dx = ((+d.x2 - +d.x) * m) * w, dy = ((+d.y2 - +d.y) * m) * fxLayer.clientHeight;
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          el.style.opacity = 0.45 * (el_ <= +d.dur ? 1 : 1 - (el_ - +d.dur) / fx.swipe.extra);
+        } else if (style === 'spotlight') {
+          const s = fx.spotlight, e = p * (s.in + s.hold + s.out);
+          el.style.opacity = e < s.in ? e / s.in : e < s.in + s.hold ? 1 : 1 - (e - s.in - s.hold) / s.out;
+        } else if (style === 'ring') {
+          el.style.transform = `scale(${(fx.ripple.r0 + (fx.ripple.r1 - fx.ripple.r0) * ease) / fx.ripple.r1})`;
+          el.style.opacity = 1 - p;
+        } else {
+          el.style.transform = `scale(${(fx.ripple.r0 + (fx.ripple.r1 - fx.ripple.r0) * ease) / fx.ripple.r1})`;
+          el.style.opacity = fx.ripple.a0 * (1 - p);
+        }
+      });
+    }
     const veil = root.querySelector(':scope > .veil');
     if (veil) veil.style.opacity = sc.veil;
   }
@@ -711,7 +782,7 @@ function previewPageHtml(job, bodies, { W, H, safe }) {
   const json = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
   const clips = Object.fromEntries(job.scenes.map((e) => [e.s.id, e.els.find((x) => x.type === 'device' && x.id === 'device')?.clipFrames]).filter(([, f]) => f));
   const body = bodies.map((b) => `<div class="slide" style="left:0;width:${W}px">${b}</div>`).join('')
-    + `<script>window.__clips = ${json(clips)};\nwindow.__timeline = ${json(job.timeline)};\nwindow.__apply = ${applyState.toString()};</script>`;
+    + `<script>window.__clips = ${json(clips)};\nwindow.__timeline = ${json(job.timeline)};\nwindow.__tapfx = ${json(TAP_FX)};\nwindow.__apply = ${applyState.toString()};</script>`;
   return pageHtml({ locale: job.locale, W, H, h: H, panorama: false, body, safe });
 }
 

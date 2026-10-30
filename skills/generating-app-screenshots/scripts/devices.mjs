@@ -88,6 +88,12 @@ export function screenRect(el, ctx) {
   return { left, top, width: g.screenW, height: g.screenH };
 }
 
+// Corner radius (px) of that screen, as renderDevice draws it.
+export function screenRadius(el, ctx) {
+  const g = geometry(el, bodyWidth(el, (el.w / 100) * ctx.W));
+  return (g.frameless ? (el.radius ?? g.m.screenRadius) : g.m.screenRadius) * g.bodyW;
+}
+
 // el: normalized device element. ctx: { W, H } canvas px.
 export function renderDevice(el, ctx) {
   const portraitW = el.landscape ? (el.w / 100) * ctx.W / (geometry(el, 1000).bodyH / 1000) : bodyWidth(el, (el.w / 100) * ctx.W);

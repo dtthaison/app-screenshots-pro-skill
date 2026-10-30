@@ -341,3 +341,16 @@ test('posterTime: a kinetic scene rests after motionLength; rise is unchanged', 
   assert.equal(words.time, 4.54);                      // 3.5 + 0.1 + 0.94
   assert.ok(words.time >= rise.time);
 });
+
+test('stateAt taps array keeps a fixed length; inactive taps are -1', () => {
+  const taps = [{ at: 1, x: 0.5, y: 0.5, kind: 'tap' }, { at: 1.2, x: 0.2, y: 0.2, kind: 'tap' }];
+  const tl = buildTimeline({}, [{ id: 'a', duration: 4, motion: 'none' }, { id: 'b', duration: 4, motion: 'none', taps, tapStyle: 'ripple' }], { fps: 30 });
+  assert.deepEqual(tl.scenes[1].taps.map((x) => x.at), [5, 5.2]);          // scene time -> absolute
+  assert.equal(stateAt(tl, 4.5).scenes[1].taps.length, 2);
+  assert.deepEqual(stateAt(tl, 4.5).scenes[1].taps, [-1, -1]);
+  assert.deepEqual(stateAt(tl, 7.5).scenes[1].taps, [-1, -1]);
+  assert.ok(sameState(stateAt(tl, 7.5), stateAt(tl, 7.6)));                   // idle frames compare equal
+  const mid = stateAt(tl, 5.3).scenes[1].taps;
+  assert.ok(mid[0] > 0 && mid[1] > 0);                                         // two taps 0.2 s apart, both drawing
+  assert.deepEqual(stateAt(tl, 5.3).scenes[0].taps, []);
+});

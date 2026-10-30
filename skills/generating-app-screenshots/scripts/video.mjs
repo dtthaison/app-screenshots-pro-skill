@@ -2,6 +2,7 @@
 // like at time t". Pure (no DOM, no ffmpeg) so it is unit-testable; the renderer
 // applies stateAt() to a page that has every scene stacked (later scenes paint above).
 import { CAPTION_MOTIONS, unitProgress, popValue, motionLength } from './kinetic.mjs';
+import { tapProgress } from './taps.mjs';
 export const FPS = 30;
 export const TRANSITIONS = { crossfade: 0.5, push: 0.6, cut: 0, 'fade-through': 0.6 };
 export const ENTRANCES = {
@@ -45,7 +46,10 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
     return {
       id: s.id, index, start, end: cursor, duration, transition: { kind, dur: TRANSITIONS[kind] ?? 0 },
       entrance, motion, captionMotion: CAPTION_MOTIONS.includes(s.captionMotion) ? s.captionMotion : 'rise', words: s.words ?? 1,
-      clip: clipOk ? s.clip : null, overflow: s.overflow ?? 0,
+      clip: clipOk ? s.clip : null,
+      // taps arrive in scene time (seconds from the scene start, already mapped through the speed ramp); the timeline keeps them absolute
+      taps: (s.taps ?? []).map((x) => ({ ...x, at: ms(start + x.at) })), tapStyle: s.tapStyle ?? null,
+      overflow: s.overflow ?? 0,
       continuous: index > 0 && !!s.continuous,                 // same layout and device as the scene before: the device stays put
       labels: (s.labels ?? []).map((l) => ({ at: l.at ?? 0, until: l.until ?? duration, text: l.text })),
       fadeIn: 0, fadeOut: 0,
@@ -100,6 +104,8 @@ export function stateAt(tl, t) {
         id: s.id, visible, opacity, tx, veil,
         device: { opacity: dev, dy: s.continuous ? 0 : rise * (1 - dev) },
         caption: kinetic ? { opacity: 1, dy: 0, units, pop } : { opacity: cap, dy: rise * (1 - cap), units, pop },
+        // one progress per tap, always the same length: 0-1 while its effect shows, -1 otherwise
+        taps: s.taps.map((x) => (visible ? tapProgress(x.at, t, x.kind, s.tapStyle, x.dur) : -1)),
         screen: { scale: s.motion === 'drift' ? 1 + (DRIFT - 1) * p : 1, scrollY: s.motion === 'scroll' ? p : 0, frame },
         labels: s.labels.map((l) => ({
           opacity: Math.min(prog(t, s.start + l.at, LABEL_FADE), 1 - prog(t, s.start + l.until - LABEL_FADE, LABEL_FADE)),
