@@ -4,7 +4,7 @@
 
 - App previews: `previews` in the config renders `.mp4` videos (H.264 High, 30 fps, stereo AAC, faststart) for `preview-iphone`, `preview-iphone-16-9`, `preview-iphone-4.7`, `preview-ipad`, `preview-ipad-9.7` and `preview-mac`.
   - Scenes take stills, HTML mocks or screen recordings (`clip`, with `{locale}` and `clipLocale`), `motion` (drift, scroll, none), timed `labels`, `in`, `transition` (crossfade, push, cut, fade-through) and continuity between scenes with the same layout.
-  - Loop fades (or `loop: "hard"`), `music`, `poster` (seconds or a scene id) with a `.poster.png`, a filmstrip in `_preview/`, and a `<video>` per file in `index.html`.
+  - Hard loop by default (`loop: "soft"` fades through the background), `music`, `poster` (seconds or a scene id) with a `.poster.png`, a filmstrip in `_preview/`, and a `<video>` per file in `index.html`.
   - Checks: duration 15–30 s, up to 3 per size and locale, 500 MB, poster in a transition, clip length and aspect, "draft" notes for stills.
   - Scene times are rounded to the millisecond (3 + 3.4 + 11.8 + 11.8 is exactly 30 s), and duration and count are checked before capture, so an out-of-range preview is never rendered.
   - `--previews`, `--scenes`, `--no-previews`, `--only-previews`; `--supersample` and `videoSupersample` for both passes; `renderScale` for drafts.

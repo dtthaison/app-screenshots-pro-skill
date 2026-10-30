@@ -20,7 +20,8 @@ const secs = (x) => `${+x.toFixed(2)}s`;                       // for messages: 
 
 export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
   const errors = [];
-  const soft = (preview.loop ?? 'soft') !== 'hard';
+  // hard loop by default: the store shows the poster, then autoplays from frame 0, so a fade-in from dark reads as a blink
+  const soft = (preview.loop ?? 'hard') === 'soft';
   let cursor = 0;
   const out = scenes.map((s, index) => {
     const numeric = s.duration === undefined || Number.isFinite(s.duration);

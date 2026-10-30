@@ -36,11 +36,13 @@ test('rise entrance: device starts 6% low and lands by 0.6s', () => {
   assert.equal(stateAt(tl, 0.6).scenes[0].device.dy, 0);
   assert.equal(stateAt(tl, 0.05).scenes[0].caption.opacity, 0);   // 0.1 s delay
 });
-test('loop fades: veil 1 at t=0, 0 at 0.4; veil 1 at the very end', () => {
-  const tl = buildTimeline({}, [{ id: 'a' }]);
+test('loop: hard by default (no veil at the ends); soft fades in over 0.4 s and out at the very end', () => {
+  const hard = buildTimeline({}, [{ id: 'a' }]);
+  assert.equal(stateAt(hard, 0).scenes[0].veil, 0); assert.equal(stateAt(hard, 3.99).scenes[0].veil, 0);
+  assert.deepEqual([hard.scenes[0].fadeIn, hard.scenes[0].fadeOut], [0, 0]);
+  const tl = buildTimeline({ loop: 'soft' }, [{ id: 'a' }]);
   assert.equal(stateAt(tl, 0).scenes[0].veil, 1); assert.equal(stateAt(tl, 0.4).scenes[0].veil, 0);
   assert.ok(stateAt(tl, 3.99).scenes[0].veil > 0.9);
-  assert.equal(stateAt(buildTimeline({ loop: 'hard' }, [{ id: 'a' }]), 0).scenes[0].veil, 0);
 });
 test('drift scales 1 → 1.03 across the scene; scroll with overflow pans 0 → 1; scroll without overflow drifts', () => {
   const tl = buildTimeline({}, [{ id: 'a', motion: 'scroll', overflow: 0.8 }, { id: 'b', motion: 'scroll', overflow: 0.01 }]);
