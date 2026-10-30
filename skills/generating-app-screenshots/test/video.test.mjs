@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode } from '../scripts/video.mjs';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import sharp from 'sharp';
+import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip } from '../scripts/video.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'asp-video-'));
 
 test('starts accumulate and default duration is 4', () => {
   const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', duration: 7 }, { id: 'c' }]);
@@ -90,4 +99,62 @@ test('unknown transition or entrance and bad clips are reported', () => {
   assert.ok(tl.errors.some((e) => e === 'scene "b": unknown transition "crossfde"'));
   assert.ok(tl.errors.some((e) => e === 'scene "a": clip needs frames and fps'));
   assert.equal(tl.scenes[1].transition.kind, 'crossfade'); assert.equal(stateAt(tl, 1).scenes[0].screen.frame, null);
+});
+
+test('encodeArgs: H.264 High 4.0 yuv420p 30fps 11M, faststart, silent stereo AAC 48k when no music', () => {
+  const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 20, music: null }).join(' ');
+  for (const s of ['-f image2pipe', '-framerate 30', 'anullsrc=channel_layout=stereo:sample_rate=48000', '-c:v libx264', '-profile:v high', '-level 4.0', '-pix_fmt yuv420p', '-b:v 11M', '-maxrate 12M', '-bufsize 24M', '-r 30', '-c:a aac', '-b:a 256k', '-ar 48000', '-ac 2', '-movflags +faststart', '-t 20', 'x.mp4']) assert.ok(a.includes(s), s);
+  assert.ok(!a.includes('-vf') && !a.includes('afade'));
+});
+test('encodeArgs with music trims to total and fades out', () => {
+  const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 20, music: { src: 'm.mp3', volume: 0.8, fadeOut: 1.5 } }).join(' ');
+  assert.ok(a.includes('-i m.mp3') && a.includes('volume=0.8') && a.includes('afade=t=out:st=18.5:d=1.5'));
+});
+test('encodeArgs scaleTo adds a lanczos scale filter', () => {
+  const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 2, music: null, scaleTo: { w: 443, h: 960 } }).join(' ');
+  assert.ok(a.includes('-vf scale=443:960:flags=lanczos'));
+});
+test('clipKey changes with params', () => assert.notEqual(clipKey({ file: __filename, start: 0, end: 1, speed: 1, height: 600 }), clipKey({ file: __filename, start: 0, end: 2, speed: 1, height: 600 })));
+test('probeClip and extractClip on a generated test clip', { skip: !findFfmpeg() }, () => {
+  const ff = findFfmpeg(), d = tmp();
+  try {
+    const clip = path.join(d, 'clip.mp4');
+    const r = spawnSync(ff, ['-f', 'lavfi', '-i', 'testsrc=size=320x640:rate=30:duration=2', '-pix_fmt', 'yuv420p', '-y', clip], { stdio: 'pipe' });
+    assert.equal(r.status, 0);
+    const p = probeClip(ff, clip);
+    assert.deepEqual([p.width, p.height, Math.round(p.duration)], [320, 640, 2]);
+    assert.equal(p.fps, 30);
+    const dir = path.join(d, 'frames');
+    const x = extractClip(ff, { file: clip, start: 0.5, end: 1.5, speed: 1, height: 320, dir });
+    assert.equal(x.count, 30); assert.ok(fs.existsSync(x.files[29]));
+    assert.equal(extractClip(ff, { file: clip, start: 0.5, end: 1.5, speed: 1, height: 320, dir }).count, 30); // cached
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+test('startEncoder writes a valid mp4', { skip: !findFfmpeg() }, async () => {
+  const ff = findFfmpeg(), d = tmp();
+  try {
+    const out = path.join(d, 'o.mp4');
+    const jpg = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#3366cc' } }).jpeg().toBuffer();
+    const enc = startEncoder(ff, encodeArgs({ fps: 30, width: 64, height: 64, out, total: 10 / 30, music: null }));
+    for (let i = 0; i < 10; i++) await enc.write(jpg);
+    await enc.end();
+    assert.ok(fs.statSync(out).size > 0);
+    const p = probeClip(ff, out);
+    assert.equal(p.width, 64); assert.ok(Math.abs(p.duration - 0.33) < 0.1, String(p.duration));
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+test('startEncoder rejects with the log tail on failure', { skip: !findFfmpeg() }, async () => {
+  const enc = startEncoder(findFfmpeg(), ['-i', '/nonexistent/x.mp4', '-y', '/nonexistent/o.mp4']);
+  await assert.rejects(enc.end(), /ffmpeg exited/);
+});
+test('filmstrip tiles one frame per second', async () => {
+  const d = tmp();
+  try {
+    const buf = await sharp({ create: { width: 100, height: 200, channels: 3, background: '#ff0000' } }).png().toBuffer();
+    const frames = Array.from({ length: 25 }, (_, i) => ({ t: i, buf }));
+    const r = await filmstrip(frames, path.join(d, 'f.jpg'));
+    const m = await sharp(r.file).metadata();
+    assert.deepEqual([m.width, m.height], [r.w, r.h]);
+    assert.ok(r.w > 10 * 120 && r.h > 3 * 240);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
