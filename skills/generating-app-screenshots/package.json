@@ -11,6 +11,7 @@
   "scripts": {
     "render": "node scripts/render.mjs",
     "record": "node scripts/record.mjs",
+    "recommend": "node scripts/recommend.mjs",
     "test": "npm run test:unit && node scripts/render.mjs examples/demo/screenshots.config.json --locales en-US --targets ios-6.9 --no-preview",
     "test:unit": "node --test test/*.test.mjs",
     "test:video": "node scripts/render.mjs examples/preview/preview.config.json --only-previews --locales en-US --targets preview-iphone --no-preview",
