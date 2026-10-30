@@ -14,7 +14,7 @@ test('rateCurve: 4x deep in idle, 1x when active, 1x around taps, bounded slope'
   const r = rateCurve(300, fps, { idle: [[1, 150]], taps: [60] });
   assert.equal(r[200], 1); assert.equal(r[120], 4);
   for (let i = 60 - 12; i <= 60 + 24; i++) assert.equal(r[i], 1);                         // 0.4 s before, 0.8 s after
-  for (let i = 1; i < 300; i++) assert.ok(Math.abs(r[i] - r[i - 1]) <= 3 / 9 + 1e-9);       // 0.3 s edge = 9 frames
+  for (let i = 1; i < 300; i++) assert.ok(Math.abs(r[i] - r[i - 1]) <= 1.5 * 3 / 9 + 1e-9);   // 0.3 s smoothstep edge = 9 frames; 1.5x is its peak slope (spec: rate changes ease over 300 ms with smoothstep)
 });
 test('frameMap is monotone and shorter than the source when ramped', () => {
   const map = frameMap(rateCurve(300, fps, { idle: [[1, 150]] }));

@@ -29,7 +29,7 @@ export function rateCurve(n, fps, { idle, taps = [], max = 4, edgeSec = 0.3, bef
   for (let i = 0; i < n; i++) { d = slow[i] ? 0 : d + 1; dist[i] = d; }
   d = Infinity;
   for (let i = n - 1; i >= 0; i--) { d = slow[i] ? 0 : d + 1; dist[i] = Math.min(dist[i], d); }
-  return Float64Array.from(dist, (x) => 1 + (max - 1) * Math.min(1, x / edge));
+  return Float64Array.from(dist, (x) => { const u = Math.min(1, x / edge); return 1 + (max - 1) * u * u * (3 - 2 * u); });   // smoothstep
 }
 
 // Source frame shown at each output frame; monotone, ends when the source position reaches n.
