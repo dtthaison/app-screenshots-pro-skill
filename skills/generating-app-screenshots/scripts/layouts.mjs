@@ -380,10 +380,12 @@ export function buildLayout(slide, ctx) {
     case 'text-left':
     case 'text-right': {
       const left = layout === 'text-left';
-      // 21:9 header: a smaller phone and a narrower caption leave room for both side by side
-      const header = cls === 'wide' && W / H >= 2;
+      // 21:9 creative header (phone model, not a desk frame): a smaller phone and a narrower caption sit side by side,
+      // caption inside the 10% safe margin. Keyed to the creative family so the Play feature graphic is untouched.
+      const creative = ctx.target?.family === 'creative' && cls === 'wide' && !desk;
+      const header = creative && W / H >= 2;
       return [
-        caption({ x: left ? 29 : 71, y: t.cy, w: header ? 40 : t.cw, h: t.ch, align: left ? 'left' : 'right', valign: 'center' }),
+        caption({ x: creative ? (left ? 31 : 69) : left ? 29 : 71, y: t.cy, w: creative ? 40 : t.cw, h: t.ch, align: left ? 'left' : 'right', valign: 'center' }),
         withFit(device({ x: left ? 76 : 24 }), t.dTop, t.dBot, header ? 22 : t.dMax),
       ];
     }
