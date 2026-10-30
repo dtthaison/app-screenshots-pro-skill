@@ -130,3 +130,123 @@ export const timeCode = (s) => {
   const cs = Math.round(s * 100), p = (n) => String(n).padStart(2, '0');
   return `${p(Math.floor(cs / 360000))}:${p(Math.floor(cs / 6000) % 60)}:${p(Math.floor(cs / 100) % 60)}:${p(cs % 100)}`;
 };
+
+// ---------- ffmpeg ----------
+// Everything below shells out to ffmpeg (found by findFfmpeg) and knows nothing about Chrome.
+import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import sharp from 'sharp';
+
+// FFMPEG_PATH, then the ffmpeg-static binary, then ffmpeg on PATH. null when none works.
+export function findFfmpeg() {
+  const env = process.env.FFMPEG_PATH;
+  if (env && fs.existsSync(env)) return env;
+  try {
+    const p = createRequire(import.meta.url)('ffmpeg-static');
+    if (p && fs.existsSync(p)) return p;
+  } catch { /* optional dependency not installed */ }
+  const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['ffmpeg'], { encoding: 'utf8' });
+  return r.status === 0 && r.stdout.trim() ? r.stdout.trim().split(/\r?\n/)[0] : null;
+}
+
+// ffmpeg-static has no ffprobe, so read `ffmpeg -i` (which exits non-zero with no output file).
+export function probeClip(ffmpeg, file) {
+  const err = spawnSync(ffmpeg, ['-hide_banner', '-i', file], { encoding: 'utf8' }).stderr || '';
+  const d = err.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const v = err.split('\n').find((l) => /Stream #.*Video:/.test(l)) || '';
+  const sz = v.replace(/\b0x[0-9a-f]+/gi, '').match(/(\d{2,5})x(\d{2,5})/);
+  const fps = v.match(/(\d+(?:\.\d+)?)\s*fps/);
+  if (!d || !sz) throw new Error(`cannot read video info from ${file}: ${err.trim().split('\n').slice(-3).join(' | ')}`);
+  return { duration: +d[1] * 3600 + +d[2] * 60 + +d[3], width: +sz[1], height: +sz[2], fps: fps ? +fps[1] : null };
+}
+
+export function clipKey({ file, start, end, speed, height }) {
+  const st = fs.statSync(file);
+  return crypto.createHash('sha1').update([st.size, st.mtimeMs, start, end, speed, height].join('|')).digest('hex').slice(0, 12);
+}
+
+// Cut [start,end] of a screen recording into 30 fps JPEGs (re-encoded, so -ss before -i is frame-accurate).
+export function extractClip(ffmpeg, { file, start = 0, end, speed = 1, height, dir }) {
+  const list = () => fs.readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().map((f) => path.join(dir, f));
+  let files = fs.existsSync(dir) ? list() : [];
+  if (!files.length) {
+    fs.mkdirSync(dir, { recursive: true });
+    const vf = [`setpts=PTS/${speed}`, `fps=${FPS}`, height ? `scale=-2:${height}` : null].filter(Boolean).join(',');
+    const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), ...(end != null ? ['-to', String(end)] : []), '-i', file, '-vf', vf, '-q:v', '2', '-y', path.join(dir, '%05d.jpg')];
+    const r = spawnSync(ffmpeg, args, { stdio: 'pipe', encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`ffmpeg exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-10).join('\n')}`);
+    files = list();
+  }
+  return { dir, files, count: files.length, fps: FPS };
+}
+
+// JPEG frames on stdin -> H.264 High 4.0 yuv420p + AAC (silent, or music trimmed to `total` with a fade-out).
+export function encodeArgs({ fps, width, height, out, total, music, scaleTo }) {
+  const a = ['-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-'];  // mjpeg: probing a pipe can miss the stream
+  a.push(...(music ? ['-i', music.src] : ['-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000']));
+  a.push('-map', '0:v', '-map', '1:a');
+  if (scaleTo) a.push('-vf', `scale=${scaleTo.w}:${scaleTo.h}:flags=lanczos`);
+  a.push('-c:v', 'libx264', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', '-r', String(fps), '-b:v', '11M', '-maxrate', '12M', '-bufsize', '24M');
+  a.push('-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2');
+  if (music) {
+    const f = [];
+    if (music.volume != null) f.push(`volume=${music.volume}`);
+    if (music.fadeOut > 0) f.push(`afade=t=out:st=${+(total - music.fadeOut).toFixed(3)}:d=${music.fadeOut}`);
+    if (f.length) a.push('-af', f.join(','));
+  }
+  a.push('-t', String(total), '-movflags', '+faststart', '-y', out);
+  return a;
+}
+
+// Spawn the encoder; write() honours back-pressure, end() resolves on exit 0 else rejects with the log tail.
+export function startEncoder(ffmpeg, args) {
+  const p = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', ...args], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const log = [];
+  let rest = '';
+  p.stderr.on('data', (d) => {
+    const lines = (rest + d).split(/\r?\n|\r/); rest = lines.pop();
+    log.push(...lines.filter(Boolean)); if (log.length > 50) log.splice(0, log.length - 50);
+  });
+  const done = new Promise((res, rej) => {
+    p.on('error', rej);
+    p.on('close', (code) => {
+      if (rest) log.push(rest);
+      code === 0 ? res() : rej(new Error(`ffmpeg exited ${code}: ${log.slice(-10).join('\n')}`));
+    });
+  });
+  done.catch(() => {}); // surfaced by end(); avoid an unhandled rejection if the caller is still writing
+  p.stdin.on('error', () => {});  // EPIPE when ffmpeg died; the exit code reports it
+  return {
+    log,
+    write: (buf) => new Promise((res) => { p.stdin.write(buf) ? res() : p.stdin.once('drain', res); }),
+    end: () => { p.stdin.end(); return done; },
+  };
+}
+
+// QA contact sheet: the frame nearest each whole second (max 30), 10 per row, 240 px high, second number underneath.
+export async function filmstrip(frames, out) {
+  const H = 240, GAP = 8, LABEL = 28, COLS = 10;
+  const pick = [];
+  for (let k = 0; k < 30; k++) {
+    const f = frames.find((x) => x.t >= k && x.t < k + 1);
+    if (f) pick.push({ k, buf: f.buf });
+  }
+  if (!pick.length) throw new Error('filmstrip: no frames');
+  const tiles = await Promise.all(pick.map(async (p) => {
+    const { data, info } = await sharp(p.buf).resize({ height: H }).png().toBuffer({ resolveWithObject: true });
+    return { ...p, data, w: info.width };
+  }));
+  const rows = Math.ceil(tiles.length / COLS), colW = Math.max(...tiles.map((t) => t.w));
+  const w = GAP + Math.min(COLS, tiles.length) * (colW + GAP), h = GAP + rows * (H + LABEL + GAP);
+  const comp = [];
+  tiles.forEach((t, i) => {
+    const x = GAP + (i % COLS) * (colW + GAP), y = GAP + Math.floor(i / COLS) * (H + LABEL + GAP);
+    comp.push({ input: t.data, left: x + Math.round((colW - t.w) / 2), top: y });
+    comp.push({ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${colW}" height="${LABEL}"><text x="${colW / 2}" y="20" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333" text-anchor="middle">${t.k}</text></svg>`), left: x, top: y + H });
+  });
+  await sharp({ create: { width: w, height: h, channels: 3, background: '#e6e6e6' } }).composite(comp).jpeg({ quality: 88 }).toFile(out);
+  return { file: out, w, h };
+}
