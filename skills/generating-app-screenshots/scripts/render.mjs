@@ -472,11 +472,14 @@ function slideOn(s, t) {
 function autoModel(e, target, locale) {
   // watches, laptops, desktops and windows keep the target's frame
   if (!['phone', 'tablet', 'none'].includes(kindOf(target.model))) return target.model;
-  const src = e.screen && resolveScreen(e.screen, locale, target.model === 'none' ? 'iphone' : target.model, e.landscape);
+  const play = target.store === 'play';
+  // a frameless target (chromebook, android-tv, android-xr) falls back to the store's phone, so an HTML mock is rendered once,
+  // at the viewport of the frame that will show it (a different model here would queue a second mock render that never runs)
+  const fallback = play ? 'android' : 'iphone';
+  const src = e.screen && resolveScreen(e.screen, locale, target.model === 'none' ? fallback : target.model, e.landscape);
   let a = src && imageMeta.get(src)?.aspect;
   if (a && e.landscape) a = 1 / a;
-  if (!a) return target.model === 'none' ? 'iphone' : target.model;
-  const play = target.store === 'play';
+  if (!a) return target.model === 'none' ? fallback : target.model;
   if (a < 1.45) return play ? 'android-tablet' : 'ipad';
   if (a < 1.85) return play ? 'android-tablet' : 'iphone-home';
   return play ? 'android' : 'iphone';
@@ -1067,7 +1070,8 @@ async function main() {
       } else if (t.store === 'ios') dest = path.join(OUT, 'fastlane', 'screenshots', storeLocale(m.locale, 'ios'), `${String(m.index).padStart(2, '0')}_${t.baseId}_${m.slide}.png`);
       else if (t.store === 'play') {
         const base = path.join(OUT, 'fastlane', 'metadata', 'android', storeLocale(m.locale, 'play'), 'images');
-        dest = t.playDir === 'featureGraphic' ? path.join(base, 'featureGraphic.png') : path.join(base, t.playDir, `${m.index}_${m.locale}.png`);
+        if (!t.playDir) { notes.push(`${t.id}: Play Console has no fastlane folder for this form factor — upload by hand (out/${t.id.replace('@', '_')}/)`); continue; }
+        dest = ['featureGraphic', 'tvBanner'].includes(t.playDir) ? path.join(base, `${t.playDir}.png`) : path.join(base, t.playDir, `${m.index}_${m.locale}.png`);
       } else continue;
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.copyFileSync(m.file, dest);

@@ -48,7 +48,7 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
 
 | Need | Config |
 |---|---|
-| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); `mac`, `windows`, `watch-ultra` (raw; `@styled`), `wear-os` (raw) |
+| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); `mac`, `windows`, `watch-ultra` (raw; `@styled`), `wear-os` (raw); Play extras `android-tv` `tv-banner` `android-xr` `android-auto` (raw) `play-promo` (video for YouTube) |
 | Device frames | `"device": { "model": "iphone\|iphone-notch\|iphone-home\|ipad\|android\|android-flat\|android-tablet\|apple-watch\|wear-os\|macbook\|desktop\|mac-window\|windows-window\|browser\|none" }` — `examples/devices/` |
 | Cross-device | layouts `phone-watch` `watch-hero` `laptop-phone`; family slides with `targets: ["watch"]` / `["desktop"]` |
 | Layout (41) | `text-top text-bottom hero device-hero screen-hero tilt-left tilt-right corner frameless landscape` · `two-devices three-devices phone-tablet before-after mosaic` · `pop-out metric annotated` · `feature-grid steps stats review awards split-photo caption-only` · wide `text-left text-right` · `caption-top` `blank` · **signature** `spotlight big-type ticker arch orbit lens layers notify deck` (`examples/signature/`) |

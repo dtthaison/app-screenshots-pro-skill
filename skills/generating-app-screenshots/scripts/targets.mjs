@@ -58,6 +58,16 @@ export const TARGETS = {
   // Wear OS: 1:1, >= 384 px, app UI only — Google forbids frames, extra text and backgrounds
   'wear-os':          { w: 768, h: 768, store: 'play', family: 'watch', model: 'wear-os', raw: true, max: 8, min: 1, playDir: 'wearScreenshots', label: 'Wear OS 1:1' },
   'play-feature-graphic': { w: 1024, h: 500, store: 'play', model: 'android', max: 1, playDir: 'featureGraphic', label: 'Play feature graphic', landscape: true },
+  // Android TV (banner required to publish a TV app; TV screenshots 16:9, at least one), Android XR (8:5, 3840×2400 recommended, 4–8, ≤ 8 MB).
+  // Android Automotive: Google wants the generic system UI only (no frames, captions or backgrounds), ≥ 2 portrait 800×1280 and ≥ 2 landscape 1024×768;
+  // supply has no folder for them, so they are uploaded by hand. Source: Play Console help "Add preview assets", read 2026-10-30.
+  'android-tv':       { w: 1920, h: 1080, store: 'play', family: 'tv', model: 'none', max: 8, min: 1, playDir: 'tvScreenshots', label: 'Android TV 16:9', landscape: true },
+  'tv-banner':        { w: 1280, h: 720, store: 'play', family: 'tv', model: 'none', max: 1, maxMB: 15, playDir: 'tvBanner', label: 'Android TV banner', landscape: true },
+  'android-xr':       { w: 3840, h: 2400, store: 'play', family: 'xr', model: 'none', max: 8, min: 4, label: 'Android XR 8:5', landscape: true },
+  'android-auto':     { w: 1024, h: 768, store: 'play', family: 'auto', model: 'none', raw: true, max: 8, min: 2, label: 'Android Automotive landscape (system UI only)', landscape: true },
+  'android-auto-portrait': { w: 800, h: 1280, store: 'play', family: 'auto', model: 'none', raw: true, max: 8, min: 2, label: 'Android Automotive portrait (system UI only)' },
+  // Play preview video: a YouTube link in Play Console, so this file is uploaded to YouTube. Only the first 30 s autoplay.
+  'play-promo':       { w: 1920, h: 1080, store: 'play', family: 'promo', model: 'android', max: 1, asc: null, landscape: true, label: 'Play preview video 16:9 (YouTube)', video: { minSec: 10, maxSec: 120, fps: 30, maxMB: 500 } },
 
   // ---- Microsoft Store (PNG, desktop >= 1366×768, 4K supported, <= 50 MB, max 10) ----
   'windows':        { w: 1920, h: 1080, store: 'msstore', family: 'desktop', model: 'windows-window', max: 10, label: 'Windows desktop 1920×1080', landscape: true },
