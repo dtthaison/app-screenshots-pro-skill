@@ -20,7 +20,6 @@
   "previews": [
     {
       "id": "walk",
-      "loop": "hard",
       "scenes": [
         {
           "id": "walk",
