@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLayout, screenAspectError } from '../scripts/layouts.mjs';
+import { buildLayout, screenAspectError, solidBackground, stillMeta } from '../scripts/layouts.mjs';
 
 const ctx = { W: 886, H: 1920, theme: {}, target: { id: 'preview-iphone', store: 'ios', model: 'iphone' } };
 const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
@@ -58,4 +58,35 @@ test('screenAspectError: 2% rule and band width rule', () => {
   assert.match(screenAspectError('caption-band', 1206, 2622, 1200, 1600), /only 50% of the canvas width/);
   assert.equal(screenAspectError('caption-band', 1206, 2622, 886, 1920), null);
   assert.equal(screenAspectError('text-top', 1206, 2622, 1200, 1600), null);
+});
+
+const cssOk = (v) => typeof v === 'string' && !/\(\s*,|,\s*\)/.test(v) && v.length > 0;
+test('band and scrim get a valid solid colour from preset, gradient and slide backgrounds', () => {
+  const run = (theme, extra = {}) => {
+    const els = (layout) => buildLayout({ id: 's', layout, title: 'x', screen: 'a.png', ...extra }, { ...ctx, theme });
+    return { band: els('caption-band').find((e) => e.id === 'band').fill, scrim: els('full-screen').find((e) => e.id === 'scrim').fill };
+  };
+  let r = run({ background: { color: '#0b0a1f', mesh: [], noise: 0.05 } });
+  assert.equal(r.band, '#0b0a1f');
+  assert.match(r.scrim.stops[0], /#0b0a1f 70%/);
+  r = run({ background: { gradient: { stops: ['#ff7e5f', '#feb47b'] } } });
+  assert.equal(r.band, '#ff7e5f');
+  r = run({ background: { gradient: { stops: ['rgba(1, 2, 3, .5) 0%', '#000 100%'] } } });
+  assert.equal(r.band, 'rgba(1, 2, 3, .5)');
+  assert.ok(cssOk(r.band) && cssOk(r.scrim.stops[0]));
+  r = run({ background: '#111' }, { background: { color: '#abcdef' } });
+  assert.equal(r.band, '#abcdef');
+  assert.equal(solidBackground(undefined), '#000');
+});
+
+test('stillMeta finds relative and {locale} stills under the absolute key', () => {
+  const meta = new Map([['/base/screens/en-US/a.png', { w: 100, h: 200 }], ['/base/b.png', { w: 1, h: 2 }]]);
+  const opts = {
+    cands: (f) => (f.includes('{locale}') ? [{ file: f.replace('{locale}', 'de') }, { file: f.replace('{locale}', 'en-US') }] : [{ file: f }]),
+    abs: (p) => `/base/${p}`, exists: (p) => meta.has(p), meta,
+  };
+  assert.deepEqual(stillMeta('b.png', opts), { w: 1, h: 2 });
+  assert.deepEqual(stillMeta('screens/{locale}/a.png?x=1', opts), { w: 100, h: 200 });
+  assert.equal(stillMeta('missing.png', opts), null);
+  assert.equal(stillMeta('mock.html', opts), null);
 });
