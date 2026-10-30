@@ -1,0 +1,60 @@
+{
+  "skill_name": "generating-app-screenshots",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use the generating-app-screenshots skill. I'm launching a new app preview video for AptusFIT, a fitness app with a streaming AI coach and a watch app. The preview brief is files/fitness-brief.json (already confirmed with the owner). Run the recommender on it and tell me the storylines you would propose to the owner. Save the recommender's JSON output to picks.json and the owner-facing message to proposal.md.",
+      "expected_output": "The agent runs scripts/recommend.mjs on the brief, and proposes 3 storylines in plain words. The picks include feature-loop and ask-answer, and the owner's must-show coach moment appears in at least one pick (the strongest). The owner-facing message is in words, not JSON, and does not reorder the ranking.",
+      "files": ["files/fitness-brief.json"],
+      "assertions": [
+        "The transcript shows scripts/recommend.mjs being run with files/fitness-brief.json as its argument",
+        "picks.json is valid JSON with exactly 3 entries in picks, with roles safe, strongest and bold",
+        "The ids of the picks in picks.json include feature-loop and ask-answer",
+        "The pick with role strongest has the moment \"coach\" in at least one of its beats",
+        "proposal.md describes 3 storylines in plain language and contains no JSON code block and no line starting with a { character",
+        "proposal.md says the coach (the owner's must-show) is shown, and names at least one risk, that the coach moment can vary from take to take (network)",
+        "None of the concept ids multi-device, bento or cinematic appears as a pick in picks.json"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Use the generating-app-screenshots skill. PennyWise is a budgeting app with no AI features: it has charts, month-over-month progress, and a receipt scanner that replaces typing expenses in by hand. The confirmed preview brief is files/budget-brief.json. Run the recommender and propose the storylines to the owner. Save the recommender's JSON output to picks.json.",
+      "expected_output": "The picks include before-after or results-first. There is no ask-answer anywhere, since the app has no AI or chat. The agent explains the choice in plain words.",
+      "files": ["files/budget-brief.json"],
+      "assertions": [
+        "The transcript shows scripts/recommend.mjs being run with files/budget-brief.json as its argument",
+        "picks.json is valid JSON whose picks include at least one with id before-after or results-first",
+        "No entry in picks.json has the id ask-answer",
+        "No entry in picks.json has the id hero-moment",
+        "The excluded list in picks.json gives ask-answer a reason that mentions ai-stream, chat, search or recommendations"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Use the generating-app-screenshots skill. The owner of PennyWise (files/budget-brief.json) will publish only on the App Store, and picked the strongest storyline. Nothing has been recorded yet; files/draft.png is a 886x1920 still you may use as the draft screen for every scene. Write preview.config.json (in the current folder, copy the brief next to it as preview-brief.json) with one preview for preview-iphone, using the storyline's concept, and run node scripts/render.mjs preview.config.json --check on it. Fix whatever it reports, then show me the final --check output.",
+      "expected_output": "The config uses a concept the recommender returned (never multi-device, bento or cinematic), full-screen or caption-band for the footage scenes, an end-card last, and draft stills for the scenes. The final --check exits 0 and does not print the device frames WARN.",
+      "files": ["files/budget-brief.json", "files/draft.png"],
+      "assertions": [
+        "preview.config.json is valid JSON with one preview whose targets are exactly [\"preview-iphone\"]",
+        "The preview's concept is neither multi-device, bento nor cinematic",
+        "Every scene except the last uses the layout full-screen or caption-band, and the last scene uses the layout end-card",
+        "Every footage scene has a \"draft\" field pointing at the draft still",
+        "The final render.mjs --check run in the transcript exits with code 0",
+        "The final --check output does not contain the text \"device frames risk rejection\"",
+        "The final --check output does not contain any line starting with ERROR"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Use the generating-app-screenshots skill. Same app as before, AptusFIT, but this time the owner's brief is files/fitness-avoid-paywall-brief.json: the owner wants the coach shown and the paywall never shown. Run the recommender and save its JSON output to picks.json.",
+      "expected_output": "No pick uses the paywall moment. The coach still appears in the strongest pick.",
+      "files": ["files/fitness-avoid-paywall-brief.json"],
+      "assertions": [
+        "The transcript shows scripts/recommend.mjs being run with files/fitness-avoid-paywall-brief.json as its argument",
+        "No beat in any pick in picks.json has the moment \"paywall\"",
+        "The pick with role strongest has the moment \"coach\" in at least one of its beats",
+        "The agent's final message does not propose showing the paywall in any storyline"
+      ]
+    }
+  ]
+}

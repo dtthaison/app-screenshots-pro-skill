@@ -181,6 +181,7 @@ See all of them rendered: `examples/gallery/out/index.html` (config: `examples/g
 | `text-left` / `text-right` | caption one side, device other | | wide canvases |
 | `caption-top` | caption band only; panorama patterns place the devices | | panoramas |
 | `blank` | nothing; place `elements` yourself | | custom |
+| `full-screen` / `caption-band` / `end-card` | footage layouts for previews: edge-to-edge recording with a scrim caption, a caption band above the recording, an icon and name card | | real-footage previews, see [Real footage previews](#real-footage-previews) |
 
 #### Cross-device layouts
 
@@ -347,7 +348,7 @@ All 15, rendered: `examples/panorama-patterns/index.html` (configs: `examples/pa
 
 ## previews
 
-App previews (the video that plays **first** on the App Store product page) and the creative videos share one top-level `previews` list. A preview is a list of **scenes**; the renderer lays the scenes out like slides, animates them, captures 30 fps frames in Chrome and encodes them with ffmpeg. `previews` and `slides` are independent: a preview does not reuse slides, but a scene is written exactly like a slide, so copy a slide into a scene to start. A single object instead of an array is accepted. Teaching examples: `examples/preview/preview.config.json` (stills, a clip, `byTarget`, every video and creative target) and `examples/preview/clip.config.json` (a scrolling recording, no frame).
+App previews (the video that plays **first** on the App Store product page) and the creative videos share one top-level `previews` list. A preview is a list of **scenes**; the renderer lays the scenes out like slides, animates them, captures 30 fps frames in Chrome and encodes them with ffmpeg. `previews` and `slides` are independent: a preview does not reuse slides, but a scene is written exactly like a slide, so copy a slide into a scene to start. A single object instead of an array is accepted. Teaching examples: `examples/preview/preview.config.json` (stills, a clip, `byTarget`, every video and creative target) and `examples/preview/clip.config.json` (a scrolling recording, no frame) and `examples/preview-recorded/` (real-footage features: marks, `speed: "auto"`, taps, kinetic captions, end card).
 
 ```jsonc
 "previews": [
@@ -367,7 +368,7 @@ App previews (the video that plays **first** on the App Store product page) and 
 ]
 ```
 
-Defaults for every preview come from `theme.video`: `{ "entrance": "rise", "transition": "crossfade", "scroll": { "speed": 1 } }` (`scroll.speed` is accepted but not used yet: a scroll always spans the scene). Merge order: `theme.video` < preview < scene.
+Defaults for every preview come from `theme.video`: `{ "entrance": "rise", "transition": "crossfade", "scroll": { "speed": 1 } }`, plus the optional `tap` and `captionMotion` described under [Real footage previews](#real-footage-previews) (`scroll.speed` is accepted but not used yet: a scroll always spans the scene). Merge order: `theme.video` < preview < scene.
 
 **Always an audio track.** Every file has a stereo AAC track, silent unless `music` is set, because App Store Connect rejects a video with no audio track and simulator recordings have none. Product page header videos are muted by default and can be unmuted; search results videos cannot be unmuted. Nothing in a creative video may depend on sound (`music` on `search-video` warns). Music is cut to the video length and faded out with `fadeOut` seconds.
 
@@ -421,10 +422,133 @@ The example's three tweaks are specific to its content; do not copy them blindly
 
 App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest, kept inside the scene and before the next scene starts covering it). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:10"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
 
+### Real footage previews
+
+A preview of real footage runs: **brief → `recommend.mjs` → storyboard (this entry) → `render.mjs --check` → `record.mjs` → sheet review → render**. The workflow is in SKILL.md; this section is the config. Teaching example: `examples/preview-recorded/` (no simulator needed; it reuses `examples/preview/recordings/en-US/walk.mp4`).
+
+```jsonc
+{
+  "id": "loop",
+  "concept": "feature-loop",                    // enables the concept checks; ids in references/video/concepts.md
+  "targets": ["preview-iphone"],                // a preview with a concept may target only preview-iphone
+  "tap": "ripple",                              // default for every scene: ripple | ring | spotlight | none
+  "captionMotion": "rise",                      // default for scenes after the first: rise | words | lines | pop | none
+  "record": {                                   // the take, run by record.mjs
+    "app": "ai.aptusfit.app",                   // bundle / application id
+    "locales": { "ja": "ja_JP" },               // store locale -> app locale ({appLocale}); default: the same
+    "setup": [ { "shell": "bash set-locale.sh {udid} {locale}" } ],   // {udid} {locale} {appLocale}; run in the config's folder
+    "steps": [
+      { "open": "myapp://session", "wait": 6, "mark": "start" },
+      { "tap": { "id": "set-done-4-0" }, "wait": 3, "mark": "log" },
+      { "swipe": { "from": "50%,70%", "to": "50%,30%", "ms": 400 }, "wait": 2 },
+      { "type": "Give me a quick hotel gym workout", "wait": 2 }
+    ]
+  },
+  "scenes": [
+    { "id": "log", "moment": "log-set", "layout": "full-screen", "title": "@loop.log", "screen": "recordings/{locale}/loop.mov",
+      "clip": { "from": "log", "to": "swap", "speed": "auto" }, "tap": "ripple", "captionMotion": "words",
+      "draft": "screens/{locale}/session.png" },
+    { "id": "end", "layout": "end-card", "title": "@loop.end", "duration": 2 }
+  ]
+}
+```
+
+**`concept`** names one of the concepts in `references/video/concepts.md`. It switches on the concept checks (hook timing, beat length, end card; see the table below) and nothing else. A preview with a `concept` may target only `preview-iphone` (886×1920); any other video target is `ERROR [<tag>] iPhone only in this release (preview-iphone)`. Without `concept`, a preview keeps its 1.1.0 behaviour and may use any video target.
+
+**`record`** is read only by `record.mjs`; `render.mjs` ignores it. The first step must be an `open`, because that whole-screen change is how the recording is synced to Maestro. Steps run in order:
+
+| Step | Fields | Notes |
+|---|---|---|
+| `open` | a URL | Opens a deep link in the take (Maestro `openLink`), so it lands in the same timeline as the taps |
+| `tap` | `{ "id": "..." }`, `{ "text": "..." }` or `{ "point": "50%,80%" }` | `id`/`text` are looked up in the rehearsal (`maestro hierarchy`) and stored as a box |
+| `swipe` | `{ "from": "50%,70%", "to": "50%,30%", "ms": 400 }` | `ms` optional |
+| `type` | a string | Maestro `inputText`, typed character by character; recorded as one `type` event |
+| `wait` | seconds | On any step, after its action |
+| `mark` | a name | On an action step only. Names the time in the recording, so scenes can say `clip.from` / `clip.to` |
+
+Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is only allowed in `setup`. The record block is checked before anything runs, with these messages (verbatim):
+`record.steps is missing or empty` · `the first step must be an "open": it changes the whole screen, and that change is how the recording is synced to Maestro` · `step N: "shell" is only allowed in setup` · `step N: unknown key "k"` · `step N: has more than one of open, tap, swipe, type` · `step N: "tap" needs id, text or point` · `step N: "swipe" needs from and to` · `step N: tap.point "x" must be whole percents like "50%,80%" (Maestro rejects fractions)` · `mark "m" used twice` · `step N: mark "m" is on a wait-only step; put it on the action step it belongs to` · `setup step N: needs a "shell" string` · `record.app (the app id) is missing`.
+
+**`record.mjs`**: `node scripts/record.mjs <config.json> --preview <id> [--udid U] [--locales a,b] [--takes 3]`. It needs Maestro 2.6+ (`maestro 2.6+ is needed to record: curl -Ls "https://get.maestro.mobile.dev" | bash`), `xcrun simctl`, exactly one booted simulator or `--udid`, and the app installed. Per locale it runs `setup`, sets the status bar to 9:41, rehearses every step (an element not found, or a system alert such as a permission prompt, is an ERROR and nothing is recorded), then films the take and writes `recordings/<locale>/<preview>.mov`, `.taps.json` and `.sheet.jpg` next to the config. With `--takes n` a failed take, or one where more than half the taps could not be aligned to a frame, is retried; a failed run leaves the previous recording, sidecar and sheet untouched. Exit 1 on any ERROR. `ASP_KEEP_TMP=1` keeps the temp folder.
+
+**The sidecar** `<recording>.taps.json` is what makes `tap`, marks and ramps work: `{ "version": 1, "fps", "width", "height", "syncOffset", "events": [ { "t", "kind": "tap|swipe|type", "x", "y", "w", "h", "x2", "y2", "dur", "text", "step", "align": "frame|window" } ], "marks": { "name": seconds } }`. Positions are fractions of the screen. `align: "frame"` means the time comes from a reaction frame; `"window"` means no clear frame change, so the command's end time was used and the ripple may be early or late. A recording made by hand, or with a hand-written sidecar like `examples/preview/recordings/en-US/walk.taps.json`, is valid.
+
+**Scene fields**
+
+| Field | Values | Meaning |
+|---|---|---|
+| `clip.from` / `clip.to` | mark names of the sidecar | The part of the recording to show. `from` defaults to the start of the file; `to` to the next mark after `from`, else the end. Cannot be combined with `clip.start`/`clip.end` |
+| `clip.speed` | a number above 0, or `"auto"` | `"auto"` plays idle stretches faster (never below 1×, at most 4×, 300 ms smoothstep edges) and keeps 0.4 s before and 0.8 s after every tap or swipe at 1×. Without `duration` the scene is as long as the ramped span; with `duration` the smallest top speed that fits is used. It needs only frames, so it works without a sidecar |
+| `tap` | `ripple`, `ring`, `spotlight`, `none` | Effect drawn at each tap and swipe of the sidecar. Effective value: `scene.tap ?? preview.tap ?? theme.video.tap ?? "ripple"`, so taps are on by default; `"none"` turns them off. Ripple: radius 3% to 12% of the screen width over 600 ms. Ring: same timing, 3 px stroke. Spotlight: dims the rest, with a cut-out 18% of the screen width wide (fade in 200 ms, hold 600 ms, fade out 300 ms). Values: `references/video/motion.md#tap-effects` |
+| `captionMotion` | `rise`, `words`, `lines`, `pop`, `none` | How the caption enters. `words`: a 70 ms stagger per word; `lines`: 120 ms per line; `pop`: scale 0.92 to 1 with opacity. Values: `references/video/motion.md#kinetic-captions`. Effective value for scenes after the first: `scene ?? preview ?? theme.video ?? "rise"`. **Scene 1 keeps its caption complete at frame 0** (the hard loop cuts back to it) unless scene 1 sets `captionMotion` itself. **`"none"` behaves like `"rise"`**: only `in: "none"` (the entrance) removes the caption animation. Languages without spaces (ja, zh, th) animate the whole title as one unit. A scene without a title falls back to `rise` |
+| `draft` | a still image path (`{locale}` allowed) | Stands in while the recording does not exist yet, so a storyboard renders and checks before the take. Without `draft`, a missing recording is an ERROR |
+| `moment` | a moment id of `preview-brief.json` | Optional. The agent writes it when building a config from a recommend pick; the hand-over report uses it to list "accept the take" for network moments |
+
+**Layouts** for footage (none of the three draws a device frame):
+
+| layout | composition |
+|---|---|
+| `full-screen` | The recording fills the canvas edge to edge, with the caption on a gradient scrim (`caption.position: "bottom"` flips it). The recording's aspect must be within 2% of the canvas, otherwise ERROR. Best match for the App Store: no device frame |
+| `caption-band` | A solid band (top 18%, or bottom) holds the caption; the screen fills the rest at its own aspect, so the caption never covers the UI |
+| `end-card` | App icon (`app.icon`), app name, the title as a tagline and a small subtitle (for example `owner.disclose`). Last scene, 1.5–3 s |
+
+**Draft, then record.** The same entry renders as a draft first: scenes whose recording is missing use their `draft` still and the run says so (NOTE below). After `record.mjs` writes the recording nothing in the config changes.
+
+**`--check`**: `node scripts/render.mjs <config.json> --check` runs every validation of the previews (scene resolution, clip spans, ramps, tap alignment, the store-rule and concept checks) and prints WARN, NOTE and ERROR lines without capturing a frame or writing a file. It implies `--only-previews` and ends with `checked N previews (no frames captured)`. Exit codes as usual: 0, 1 (ERROR), 2 (crash). Run it on the storyboard before recording and again before the final render.
+
+**`preview-brief.json`** sits next to the config and is read by `recommend.mjs` and (for `owner.disclose` and the network moments of the hand-over) by `render.mjs`:
+
+```jsonc
+{ "app": { "name": "", "category": "fitness|health|finance|ai|productivity|social|education|travel|shopping|games|utilities|media|food", "promise": "" },
+  "signals": ["ai-stream", "timer"],            // vocabulary: references/video/concepts.md
+  "moments": [ { "id": "log-set", "title": "", "signals": ["timer"], "reach": "deep link ..., tap ...", "automatable": true, "seconds": 4 } ],   // automatable: true | false | "network"
+  "owner": { "audience": "", "mustShow": ["moment ids"], "mustAvoid": ["moment ids or signals"], "channels": ["app-store"], "tone": "", "occasion": "", "disclose": "", "confirmed": true } }
+```
+
+`node scripts/recommend.mjs <preview-brief.json> [--json]` prints three picks (safe, strongest, bold) with beats, risks and reasons, then the excluded concepts. The strongest pick features a must-show moment whenever the owner named one. A brief error is `ERROR <message>` and exit 1.
+
+**WARN, NOTE and ERROR lines** (exact text; the report may add a `[<target>/<locale>/<preview>]` or `[<target>/<locale>/<preview>/<scene>]` prefix; only ERROR changes the exit code):
+
+| Level | Text | When |
+|---|---|---|
+| WARN | `scene "x": device frames risk rejection under 2.3.4 — use full-screen or caption-band` | Apple preview target with a framed device |
+| WARN | `scene "x": "$4.99" looks like a price — prices and currencies vary by region (apple-prices)` | Price in a caption (Apple preview and creative targets) |
+| WARN | `scene "x": "best" — Google Play asks for no calls to action or superlatives (play-phrases)` | `play-promo` captions |
+| NOTE | `scene "x": "2026" dates the video — avoid years and seasons (apple-seasonal)` and `... "March" dates the video — avoid months and seasons (apple-seasonal)` | A year or a month name in any video caption |
+| WARN | `scene "x": caption is fully visible for 0.9s but 5 words need 2.0s to read` | A caption visible for less than 0.5 s + 0.3 s per word, after the caption motion |
+| WARN | `scene "x": label "t" is up for 1.0s but 4 words need 1.7s to read` | The same for a timed label |
+| WARN | `hook-timing: the first caption is fully visible at 1.4s — it should be by 1.0s` | Concept; first caption |
+| WARN | `beat-length: scene "x" lasts 1.5s — beats last 2-5s` · `beat-length: scene "x" lasts 6s — beats last 2-5s (one beat may run to 8s)` · `beat-length: scene "x" lasts 9s — even a hero beat stops at 8s` | Concept; `hero-moment` and `ask-answer` allow one beat up to 8 s |
+| WARN | `end-card: concept "c": no end card — the last scene should use layout end-card` · `end-card: scene "x" is not the last scene` · `end-card: scene "x" lasts 4s — the end card lasts 1.5-3s` | Concept |
+| NOTE | `owner.disclose is set ("...") but the preview has no end-card scene — show it in the footage or add an end card (apple-disclose)` | Concept preview with `owner.disclose` |
+| NOTE | `end-card "x": no app.icon in the config — showing the name only` | `end-card` without `app.icon` |
+| WARN | `caption-band: the screen is only 50% of the canvas width` | The screen is under 80% of the canvas width. Expected in `examples/preview/preview.config.json` for `preview-ipad`, which keeps `caption-band` because this release is iPhone-first |
+| WARN | `clip 400×960 does not match the iphone screen (2.17:1) — it will be cropped` | Clip aspect more than 2% off the device screen |
+| WARN | `clip <path> is 2.0s but scene "x" lasts 4s — the last frame holds` | Clip shorter than the scene |
+| NOTE | `taps skipped: no sidecar` | A `tap` was set explicitly (scene, preview or theme) and the recording has no `.taps.json`. With the default (nothing set) it stays silent |
+| NOTE | `tap at 3.20s was timed from the command window (may be early or late)` | A tap with `align: "window"` |
+| WARN | `invalid sidecar <file>: <reasons> — taps skipped` | The sidecar is unreadable or wrong, and the scene does not use `clip.from`/`to` |
+| NOTE | `[tag] draft stills stand in for missing recordings (a, b) — record the app for the final preview` | Draft scenes |
+| WARN | `poster 5.00s falls inside the entrance of scene "x"` | Poster time inside an entrance, caption motion included |
+| ERROR | `iPhone only in this release (preview-iphone)` | A preview with `concept` on any other video target |
+| ERROR | `recording <path> not found — run: node scripts/record.mjs <config> --preview <id>` | Missing recording and no `draft` |
+| ERROR | `draft <path> for scene "x" must be an existing still image` | `draft` missing, or a clip or HTML mock |
+| ERROR | `screen 880×1912 does not fit full-screen on 886×1920 (aspect off by 5%) — use caption-band or record on the matching device` | `full-screen` and a recording more than 2% off the canvas aspect |
+| ERROR | `clip.from/to and clip.start/end cannot be combined — use one or the other` | |
+| ERROR | `invalid sidecar <file>: <reasons>` | The sidecar is invalid **and** the scene uses `clip.from`/`to` |
+| ERROR | `clip marks need <sidecar path> — record with record.mjs` | `clip.from`/`to` and no sidecar |
+| ERROR | `unknown mark "x" (marks: a, b)` · `mark "to" (1.2s) is not after "from" (3.4s)` | Bad marks |
+| ERROR | `clip.speed must be a number above 0 or "auto" (got "fast")` | |
+| ERROR | `clip span is 12.0s at 4× but scene "x" lasts 2.0s` | `speed: "auto"` with a `duration` too short even at 4× |
+| ERROR | `unknown tap "x" (ripple, ring, spotlight, none)` · `scene "x": unknown captionMotion "y" (rise, words, lines, pop, none)` | |
+| ERROR | `preview is 9s; preview-iphone wants 15–30s` | Total after ramping; still an ERROR |
+
+Taps and ramps for a clip are deterministic: the same recording and config give the same frames.
+
 ## CLI
 
 `node scripts/render.mjs <config> [--out dir] [--locales a,b] [--targets a,b] [--slides a,b] [--format png|jpeg|webp] [--supersample 2] [--fastlane] [--no-preview]`
-`  [--previews a,b] [--scenes a,b] [--no-previews] [--only-previews]`
+`  [--previews a,b] [--scenes a,b] [--no-previews] [--only-previews] [--check]`
 Rendering happens at `supersample`× (default 2; config `"supersample"`) and is downsampled with Lanczos for crisp edges. Use 1 for quick drafts.
 `--supersample` applies to both passes; the video default is 1 (`videoSupersample` in the config sets it). `renderScale` on a video target (or in a preview's `byTarget`) renders at that fraction and upscales: drafts only (`NOTE … rendered at 0.5× — drafts only`).
 `--targets` and `--locales` filter both passes. `--slides` filters screenshots only. `--previews tour` renders only those previews. `--scenes a,b` renders only those scenes of a preview (for iterating; the duration check is skipped and a NOTE says so). `--no-previews` skips the video pass and `--only-previews` skips the screenshot pass (`--no-preview`, singular, is the QA sheets). A video target in `targets` with no `previews` in the config is an ERROR.

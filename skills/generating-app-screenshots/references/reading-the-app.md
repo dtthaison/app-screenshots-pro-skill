@@ -63,7 +63,53 @@ Save as `screens/<locale>/<name>.png`. Missing locales fall back to the language
 
 ## 2b. Record the app for previews
 
-App previews and the creative videos (header, search results, In-App Event) show **how the app works**, so they want a recording of the main flow. Stills work for a draft only. Record each device class you ship a preview for; a clip is cropped when its aspect is more than 2% off the device frame's screen.
+App previews and the creative videos (header, search results, In-App Event) show **how the app works**, so they want a recording of the main flow. Stills work for a draft only. The recorder, `scripts/record.mjs`, films a scripted take on the iOS Simulator and writes everything the renderer needs: the `.mov`, a tap sidecar (`.taps.json`, with marks) and a 1 fps contact sheet (`.sheet.jpg`). This release records on iPhone only; record on the same device class as the target (886×1920 for `preview-iphone`).
+
+### Moments, deep links and test IDs
+
+A take is a short script of **moments**: things that move, such as a timer starting, a sheet opening, a number counting up. Find them while you read the code (§1), write them in `preview-brief.json`, and for each one note how to reach it without hand-driving the app:
+
+- **Deep links.** The most reliable start. Look for the URL scheme (`Info.plist` `CFBundleURLSchemes`, `app.json` `scheme`, Android `intent-filter` with `<data android:scheme=…>`) and the route table. A step of `{ "open": "myapp://session" }` then lands on the same screen every take.
+- **Expo Router.** A `(dev)` or `(marketing)` route group is a good place for seeded screens: `app/(dev)/marketing.tsx` reads `?action=session|swap|progress` and loads fixed data, so the link `exp+<slug>://marketing?action=session` (dev client) or `<scheme>://marketing?action=session` shows a seeded state. Ship it behind `__DEV__` only, and tell the owner you added it.
+- **Android intents.** `adb shell am start -a android.intent.action.VIEW -d "myapp://session" <package>` is the equivalent of an `open`. For apps without a link, `adb shell am start -n <package>/.DebugActivity --es screen session`.
+- **Flutter keys.** Give the widgets a stable key, `Key('set-done-4-0')`, and expose it as a semantics identifier (`Semantics(identifier: 'set-done-4-0', child: …)`), which Maestro reads as an `id`. `integration_test` finders on the same keys keep the take and the tests in step.
+- **Test IDs.** React Native: `testID="set-done-4-0"`; SwiftUI: `.accessibilityIdentifier("set-done-4-0")`; Compose: `Modifier.testTag("…")` with `testTagsAsResourceId = true`. A `tap` step uses `{ "id": "set-done-4-0" }`. Without an ID, `{ "text": "Arnold Press" }` matches the visible text or accessibility label.
+- **Seed data and locale.** Use `record.setup` (a `shell` step, for example a script that resets the app and sets the language) so every take starts from the same state. Never record a real person's data.
+
+### The record block
+
+Add a `record` block to the preview (config.md → Real footage previews has every field):
+
+```jsonc
+"record": {
+  "app": "com.example.app",
+  "setup": [ { "shell": "bash marketing/set-locale.sh {udid} {locale}" } ],
+  "steps": [
+    { "open": "myapp://session", "wait": 6, "mark": "start" },
+    { "tap": { "id": "set-done-4-0" }, "wait": 3, "mark": "log" },
+    { "open": "myapp://session?sheet=swap", "wait": 6, "mark": "swap" }
+  ]
+}
+```
+
+Then:
+```bash
+node scripts/render.mjs <config> --check                      # the storyboard, against draft stills
+node scripts/record.mjs <config> --preview <id> [--udid U] [--locales a,b] [--takes 3]
+```
+It needs [Maestro](https://maestro.mobile.dev) 2.6+, Xcode's `xcrun simctl`, one booted simulator (or `--udid`) and the app installed. It rehearses every step first and stops with an ERROR for an element it cannot find or a system alert (permission prompt, notification banner): grant or turn off the permission in the simulator first. A failed run leaves the previous recording untouched.
+
+Rules for a good take:
+- **Slow, deliberate gestures**, and about 1 s of pause on every screen (`wait`). Idle stretches are sped up later with `speed: "auto"`; taps stay at 1×.
+- **Mark every moment** you want as a scene, and cut with `clip: { "from": "log", "to": "swap" }`.
+- No keyboard unless it is the point, no personal data, no debug banners, status bar 9:41 (the recorder sets it).
+- **One recording per locale**: `--locales`, with `record.locales` mapping store locale to app locale. Or one English recording with `"clipLocale": "en-US"` on the preview (the other locales then reuse it and the renderer stops warning that the UI language does not match).
+- **Review `recordings/<locale>/<preview>.sheet.jpg` before rendering** with the must-not-ship checklist in SKILL.md.
+- Apple wants the previews to show real in-app use. Simulator recordings carry no audio; the renderer adds a silent stereo track (or your `music`).
+
+### Fallback: record by hand
+
+When Maestro or a simulator is not available (a physical device, an Android emulator, a web app), record by hand and point scenes at the file. Without a sidecar, `tap` effects are skipped (with a NOTE), `speed: "auto"` still works because it needs only frames, and `clip.from`/`to` marks are an ERROR (use `clip.start`/`end`). A hand-written `.taps.json` next to the recording restores marks and tap effects (`examples/preview/recordings/en-US/walk.taps.json`).
 
 **iOS Simulator** (set the status bar override from §2 first)
 ```bash
@@ -78,15 +124,9 @@ adb shell screenrecord --bit-rate 8000000 /sdcard/flow.mp4      # stops after 18
 adb pull /sdcard/flow.mp4 recordings/en-US/flow.mp4
 ```
 
-Rules for a good recording:
-- **Slow, deliberate gestures**, and about 1 s of pause on every screen: the video is cut into 15–30 s of scenes and viewers read at that pace.
-- No keyboard unless it is the point, no personal data, no debug banners, clean status bar.
-- **One recording per locale** (UI in that language), or one English recording with `"clipLocale": "en-US"` on the preview (the other locales then reuse it and the renderer stops warning that the UI language does not match).
-- One long recording can become several scenes: cut it with `clip: { "start": 12, "end": 19 }` and a caption per chapter.
-- HTML mocks do not record: a mock is a still (drift or scroll). A preview made only of stills and mocks is a draft; replace them with recordings before submitting.
-- Apple wants the previews to show real in-app use. Simulator recordings carry no audio; the renderer adds a silent stereo track (or your `music`).
+The same rules apply, plus: one long recording can become several scenes with `clip: { "start": 12, "end": 19 }` and a caption per chapter; HTML mocks do not record (a mock is a still, and a preview made only of stills and mocks is a draft). A clip is cropped when its aspect is more than 2% off the frame's screen.
 
-Point scenes at them with `"screen": "recordings/{locale}/flow.mov"` (see config.md → previews, and `examples/preview/`).
+Point scenes at recordings with `"screen": "recordings/{locale}/flow.mov"` (see config.md → previews, `examples/preview/` and `examples/preview-recorded/`).
 
 ## 3. When no build can run: HTML mock screens
 

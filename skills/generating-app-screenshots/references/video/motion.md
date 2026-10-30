@@ -47,12 +47,12 @@ Two taps closer together than the ripple's 600 ms each draw their own ripple, an
 
 ## Kinetic captions {#kinetic-captions}
 
-Each word translates from 110% to 0 inside an `overflow:hidden` clipping box. Optional blur from 8 px to 0. Keep text at
+Each word translates from 110% of its own height below the line, plus 0.4 em (the clipping box's padding, so a word starts fully hidden), to 0 inside an `overflow:hidden` clipping box. Optional blur from 8 px to 0. Keep text at
 least 48 pt equivalent.
 
 | Style | Values | Source | Status |
 |---|---|---|---|
-| Words | 70 ms stagger (research range 60-120 ms), 450 ms per word (range 350-600 ms), `1 - 2^(-10p)` expo-out, rise from 110% | HyperFrames and craft values | verified (stagger range), reported (rest) |
+| Words | 70 ms stagger (research range 60-120 ms), 450 ms per word (range 350-600 ms), `1 - 2^(-10p)` expo-out, rise from 110% below the line, plus 0.4 em | HyperFrames and craft values | verified (stagger range), reported (rest) |
 | Lines | the same, with a 120 ms stagger per line | craft value | reported |
 | Pop | scale 0.92 to 1 and opacity 0 to 1, spring with zeta = 0.8 and ω0 = 10 rad/s | craft value | reported |
 | Reading time | visible for at least 0.5 s + 0.3 s per word, otherwise WARN `reading-time` | HyperFrames; Apple: text "remains on the screen long enough" | verified |

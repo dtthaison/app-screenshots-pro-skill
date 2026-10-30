@@ -16,6 +16,7 @@ A Claude Code skill that turns your app into App Store and Google Play screensho
 - **41 layouts and 15 panorama patterns.** These include hero, tilt, before/after, mosaic, feature grid and reviews, plus signature layouts (spotlight, big-type, ticker, arch, orbit, lens, layers, notify, deck) and connected panoramas whose phones span two slides.
 - **58 store sizes.** Every current App Store, Play (phone, tablet, Chromebook, Wear OS, Android TV, Android XR, Android Automotive, the YouTube preview video), Mac App Store, Microsoft Store and Apple Watch size, the App Store preview video sizes, the product page header, search results and In-App Event images and videos, plus social formats (OG image, X, Product Hunt, Instagram, Story, Story video).
 - **App preview videos.** Scenes (stills, HTML mocks or screen recordings) with captions, labels and transitions become 15–30 s `.mp4` files for every App Store preview size and locale: H.264, 30 fps, a silent or music audio track, a poster frame and a filmstrip to review.
+- **Real-footage previews.** Describe the app in a brief and `recommend.mjs` proposes three storylines. `record.mjs` films the chosen one on the iOS Simulator with Maestro and writes a tap sidecar, then the renderer adds tap ripples, speed ramps through idle stretches, word-by-word captions and an end card, checks the App Store rules (`render.mjs --check`) and writes a hand-over report. iPhone only in this release.
 - **Product page header, search results and In-App Event assets.** Images (21:9, 3:2, 16:9, 9:16) and videos at the exact sizes Apple lists, from the same config.
 - **Checks the output against store rules.** Exact pixel sizes, no alpha channel, per-store screenshot count and file size limits, and video duration, count and size. It also warns when text is clipped, covered by a device, shrunk below 90%, or about to fall in a panorama seam.
 - **Ready to upload.** `--fastlane` writes the folder layout that `fastlane deliver` and `supply` expect.
@@ -117,7 +118,8 @@ The full schema is in [`references/config.md`](skills/generating-app-screenshots
 | [`examples/signature`](skills/generating-app-screenshots/examples/signature) | The 9 signature layouts |
 | [`examples/panorama-patterns`](skills/generating-app-screenshots/examples/panorama-patterns) | All 15 panorama patterns |
 | [`examples/devices`](skills/generating-app-screenshots/examples/devices) | Watch, Wear OS, Mac, Windows and cross-device slides |
-| [`examples/preview`](skills/generating-app-screenshots/examples/preview) | An app preview with a synthetic recording, labels and a poster, plus the header, search and event assets (`npm run example:preview`; `example:preview-clip` for a scrolling recording) |
+| [`examples/preview`](skills/generating-app-screenshots/examples/preview) | An app preview with a synthetic recording, labels and a poster, plus the header, search and event assets (`npm run example:preview`; `example:preview-clip` for a scrolling recording). It prints one expected WARN, `caption-band: the screen is only 50% of the canvas width`, for `preview-ipad`, because this release is iPhone-first |
+| [`examples/preview-recorded`](skills/generating-app-screenshots/examples/preview-recorded) | A real-footage preview: marks, speed ramp, tap ripples, word-by-word captions and an end card, without a simulator (`npm run example:preview-recorded`) |
 
 Rebuild the showcase site (`docs/`) after rendering the examples with `npm run examples && npm run site`.
 
