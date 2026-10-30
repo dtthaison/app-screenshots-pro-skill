@@ -297,3 +297,34 @@ test('missingClipWarning in a per-job Set warns once per locale however many sce
   for (const scene of ['a', 'b', 'c']) { const w = missingClipWarning('vi', 'en-US'); if (w) seen.add(w); void scene; }
   assert.equal(seen.size, 1);
 });
+
+test('scene 1 keeps a complete caption at frame 0 (no units) unless it sets captionMotion itself', () => {
+  const tl = buildTimeline({}, [{ id: 'a', captionMotion: 'rise', words: 3 }, { id: 'b' }]);
+  const c = stateAt(tl, 0).scenes[0].caption;
+  assert.equal(c.opacity, 1); assert.equal(c.dy, 0); assert.deepEqual(c.units, []); assert.equal(c.pop, null);
+  const own = stateAt(buildTimeline({}, [{ id: 'a', captionMotion: 'words', words: 3 }]), 0).scenes[0].caption;
+  assert.deepEqual(own.units, [0, 0, 0]);
+});
+test('kinetic units start at the entrance start (a + delay); the caption box stays opaque', () => {
+  const tl = buildTimeline({}, [{ id: 'a', motion: 'none' }, { id: 'b', motion: 'none', captionMotion: 'words', words: 3 }]);
+  const start = 4 - 0.5 + 0.1;                                   // crossfade window + entrance delay
+  assert.deepEqual(stateAt(tl, start).scenes[1].caption.units, [0, 0, 0]);
+  const c = stateAt(tl, start + 0.2).scenes[1].caption;
+  assert.ok(c.units[0] > c.units[1] && c.units[1] > c.units[2] && c.units[2] > 0);
+  assert.equal(c.opacity, 1); assert.equal(c.dy, 0);
+});
+test('caption units freeze after motionLength (rest frames compare equal)', () => {
+  const tl = buildTimeline({}, [{ id: 'a', motion: 'none' }, { id: 'b', motion: 'none', captionMotion: 'words', words: 3 }]);
+  const done = 4 - 0.5 + 0.1 + 0.59;
+  assert.ok(sameState(stateAt(tl, done + 0.2), stateAt(tl, done + 0.9)));
+  assert.deepEqual(stateAt(tl, done).scenes[1].caption.units, [1, 1, 1]);
+});
+test('pop: caption.pop runs then freezes; units stay empty', () => {
+  const tl = buildTimeline({}, [{ id: 'a', motion: 'none' }, { id: 'b', motion: 'none', captionMotion: 'pop', words: 2 }]);
+  const mid = stateAt(tl, 3.6 + 0.2).scenes[1].caption;
+  assert.deepEqual(mid.units, []); assert.ok(mid.pop.scale > 0.92 && mid.pop.opacity > 0);
+  assert.ok(sameState(stateAt(tl, 3.6 + 0.8), stateAt(tl, 3.6 + 1.2)));
+});
+test('unknown captionMotion is an error naming the scene', () => {
+  assert.match(buildTimeline({}, [{ id: 'a', captionMotion: 'spin' }]).errors[0], /scene "a".*captionMotion "spin"/);
+});
