@@ -2,8 +2,9 @@
 // Render store screenshots from screenshots.config.json with headless Chromium.
 // Usage: node render.mjs <config.json> [--out dir] [--locales en-US,vi] [--targets ios-6.9,ipad-13]
 //                       [--slides id1,id2] [--format png|jpeg|webp] [--fastlane] [--no-preview]
-//                       [--previews id1,id2] [--scenes id1,id2] [--no-previews] [--only-previews] [--supersample n]
+//                       [--previews id1,id2] [--scenes id1,id2] [--no-previews] [--only-previews] [--check] [--supersample n]
 // --no-preview skips the QA contact sheets and index.html; --no-previews skips the app preview (video) pass.
+// --check runs every preview validation (and the store checks) without capturing frames; it implies --only-previews.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +20,7 @@ import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kineti
 import { frameDiffs } from './align.mjs';
 import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from './ramp.mjs';
 import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, resolveTap } from './taps.mjs';
+import { storeChecks, iphoneOnly } from './storecheck.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -40,7 +42,8 @@ const TARGETS = list(flag('targets'))?.map((id) => CFG_TARGETS.find((t) => t.id 
 // app previews (video): --previews / --scenes pick previews and scenes by id; --only-previews skips the screenshot pass
 const PREVIEW_FILTER = list(flag('previews'));
 const SCENE_FILTER = list(flag('scenes'));
-const NO_PREVIEWS = has('no-previews'), ONLY_PREVIEWS = has('only-previews');
+const NO_PREVIEWS = has('no-previews'), CHECK = has('check'), ONLY_PREVIEWS = has('only-previews') || CHECK;
+let checked = 0;   // --check: jobs that passed every validation and were skipped before the encoder
 // the screenshot pass renders stills only; video targets belong to the video pass
 const STILL_TARGETS = ONLY_PREVIEWS ? [] : TARGETS.filter((t) => !isVideoTarget(t));
 let VIDEO_TARGETS = NO_PREVIEWS ? [] : TARGETS.filter(isVideoTarget);   // emptied when ffmpeg is missing
@@ -518,6 +521,9 @@ async function loadImageMeta(srcs, locale) {
   }
 }
 
+// preview-brief.json next to the config (written by the recommend step); only owner.disclose is read here
+const previewBrief = (() => { try { return JSON.parse(fs.readFileSync(path.join(BASE, 'preview-brief.json'), 'utf8')); } catch { return null; } })();
+
 // -> [{ preview, target, locale, W, H, scenes: [{ scene, s, th, els, clip, overflow, labelEls }], timeline, warnings: Set }]
 async function resolvePreviews({ ffmpeg }) {
   const jobs = [], vdef = theme.video || {};
@@ -526,11 +532,14 @@ async function resolvePreviews({ ffmpeg }) {
     const W = target.w, H = target.h, warnSet = new Set();
     const preview = { transition: vdef.transition, ...specialize(p0, target, locale) };
     const tag = `${target.id}/${locale}/${preview.id}`;
+    // concept previews are recorded on iPhone only in this release
+    const iphoneMsg = preview.concept && iphoneOnly(target);
+    if (iphoneMsg) { errors.push(`[${tag}] ${iphoneMsg}`); continue; }
     let list;
     try { list = selectScenes(p0.scenes, preview.scenes); } catch (e) { errors.push(`[${tag}] ${e.message}`); continue; }
     const { preset, ...pt } = preview.theme || {};
     const base = preview.theme ? layer(layer(theme, presetTheme(preset)), pt) : theme;
-    const scenes = [];
+    const scenes = [], checkScenes = [], drafts = [];
     // --scenes: a preview without any of the named scenes is skipped, not an error
     const pick = list.filter((x) => slideOn(x, target) && (!SCENE_FILTER || SCENE_FILTER.includes(x?.id)));
     if (SCENE_FILTER && !pick.length) continue;
@@ -550,6 +559,11 @@ async function resolvePreviews({ ffmpeg }) {
           info = { file: abs(hit.file), ...probeClip(ffmpeg, abs(hit.file)) };
           imageMeta.set(info.file, { w: info.width, h: info.height, aspect: info.height / info.width });
           scene.screen = info.file;
+        } else if (isClip(src)) {
+          // no recording yet: a draft still stands in, otherwise this is an error
+          if (!scene.draft) throw new Error(`recording ${path.relative(BASE, abs(screenCands(src, locale)[0].file))} not found — run: node scripts/record.mjs <config> --preview ${preview.id}`);
+          scene.screen = scene.draft;
+          drafts.push(scene.id);
         }
         await loadImageMeta([scene.screen, scene.screen2, scene.screen3, ...(scene.elements || []).map((e) => e.screen)], locale);
         const { s, th, els } = slideElements({ ...scene, labels: timed.length ? undefined : scene.labels }, target, locale, W, H, base);
@@ -642,6 +656,9 @@ async function resolvePreviews({ ffmpeg }) {
         const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: cap?.x ?? 50, z: 6,
           y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
         scenes.push({ scene: { ...scene, labels: timed, captionMotion, words, taps: tapList, tapStyle: tapStyleUsed }, s, th, els, clip, overflow, labelEls });
+        // texts the viewer reads, resolved for this locale; checked by storecheck.mjs
+        checkScenes.push({ id: scene.id, layout: s.layout, dev, hasCaption: !!capTitle,
+          texts: [scene.eyebrow, scene.title, scene.subtitle, ...timed.map((l) => l.text)].map((x) => str(x, locale)).filter((x) => typeof x === 'string' && x) });
       } catch (e) { errors.push(`[${tag}/${scene.id}] ${e.message}`); }
     }
     if (!scenes.length) { errors.push(`[${tag}] no scenes to render for this target`); continue; }
@@ -653,6 +670,13 @@ async function resolvePreviews({ ffmpeg }) {
         && ['x', 'y', 'w', 'model', 'landscape', 'rotate', 'tiltX', 'tiltY'].every((k) => (a[k] || 0) === (b[k] || 0)));
     });
     const timeline = buildTimeline(preview, scenes.map((e) => ({ ...e.scene, clip: e.clip || undefined, overflow: e.overflow, continuous: e.continuous })), { fps: target.video.fps });
+    // a failed scene leaves the lists short; the build errors say why, so only check a complete set
+    if (checkScenes.length === scenes.length && !timeline.errors.length) {
+      const r = storeChecks({ target, locale, preview, scenes: checkScenes, timeline, disclose: previewBrief?.owner?.disclose });
+      for (const w of r.warnings) warnSet.add(w);
+      for (const n of r.notes) notes.push(`[${tag}] ${n}`);
+    }
+    if (drafts.length) notes.push(`[${tag}] draft stills stand in for missing recordings (${drafts.join(', ')}) — record the app for the final preview`);
     jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet });
   }
   return jobs;
@@ -840,6 +864,7 @@ async function renderPreviews(browser, jobs, ffmpeg) {
     const failedLoad = await page.goto(pathToFileURL(html).href, { waitUntil: 'networkidle', timeout: 60000 }).then(() => null, (e) => e);
     if (failedLoad) { errors.push(`[${tag}] page failed to load: ${failedLoad.message.split('\n')[0]}`); continue; }
     await fitScenes(page, job);
+    if (CHECK) { checked++; continue; }   // everything validated; no frames, no encoder
 
     const index = (counter[`${t.id}|${locale}`] = (counter[`${t.id}|${locale}`] || 0) + 1);
     const dir = path.join(OUT, slug, locale), base = `${String(index).padStart(2, '0')}_${preview.id}`;
@@ -1284,6 +1309,13 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
   // previews: JSON-safe fields only (target.video can hold Infinity)
   const pvJson = shipped.map((p) => ({ id: p.job.preview.id, target: p.job.target.id, locale: p.job.locale, index: p.index,
     file: path.relative(OUT, p.file), poster: path.relative(OUT, p.poster), posterTime: p.posterTime, duration: p.job.timeline.total }));
+  if (CHECK) {
+    for (const nt of [...new Set(notes)]) console.log(`  NOTE  ${nt}`);
+    for (const w of [...new Set(warnings)]) console.log(`  WARN  ${w}`);
+    for (const e of [...new Set(errors)]) console.log(`  ERROR ${e}`);
+    console.log(`checked ${checked} previews (no frames captured)`);
+    process.exit(errors.length ? 1 : 0);
+  }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ generated: new Date().toISOString(), files: manifest.map((m) => ({ ...m, file: path.relative(OUT, m.file) })), previews: pvJson, warnings, errors }, null, 2));
   console.log(`Rendered ${manifest.length} screenshots + ${previews.length} previews → ${OUT}`);
   console.log(`  targets: ${[...STILL_TARGETS, ...VIDEO_TARGETS].map((t) => t.id).join(', ')} | locales: ${LOCALES.join(', ')} | slides: ${STILL_TARGETS.length ? slides.length : 0}${previews.length ? ` | previews: ${[...new Set(previews.map((p) => p.job.preview.id))].join(', ')}` : ''}`);

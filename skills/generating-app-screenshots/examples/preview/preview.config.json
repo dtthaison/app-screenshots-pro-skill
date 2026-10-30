@@ -66,7 +66,15 @@
           "title": "@hero.title",
           "subtitle": "@hero.subtitle",
           "screen": "../demo/screens/home.html",
-          "duration": 5
+          "duration": 5,
+          "byTarget": {
+            "preview-iphone": {
+              "layout": "caption-band"
+            },
+            "preview-ipad": {
+              "layout": "caption-band"
+            }
+          }
         },
         {
           "id": "stats",
@@ -92,6 +100,12 @@
                 "y": 14,
                 "h": 44
               }
+            },
+            "preview-iphone": {
+              "layout": "caption-band"
+            },
+            "preview-ipad": {
+              "layout": "caption-band"
             }
           },
           "caption": {
@@ -105,7 +119,15 @@
           "subtitle": "@remind.subtitle",
           "screen": "../demo/screens/remind.html",
           "motion": "scroll",
-          "duration": 5
+          "duration": 5,
+          "byTarget": {
+            "preview-iphone": {
+              "layout": "caption-band"
+            },
+            "preview-ipad": {
+              "layout": "caption-band"
+            }
+          }
         },
         {
           "id": "close",
