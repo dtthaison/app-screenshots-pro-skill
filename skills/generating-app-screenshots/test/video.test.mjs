@@ -328,3 +328,11 @@ test('pop: caption.pop runs then freezes; units stay empty', () => {
 test('unknown captionMotion is an error naming the scene', () => {
   assert.match(buildTimeline({}, [{ id: 'a', captionMotion: 'spin' }]).errors[0], /scene "a".*captionMotion "spin"/);
 });
+test('posterTime: a kinetic scene rests after motionLength; rise is unchanged', () => {
+  const mk = (cm) => buildTimeline({}, [{ id: 'a' }, { id: 'b', captionMotion: cm, words: 8 }]);
+  // entrance starts at 3.5 (crossfade window) + 0.1 delay; 8 words: 0.07*7+0.45 = 0.94 s, longer than the 0.6 s rise
+  const rise = posterTime(mk('rise'), 'b'), words = posterTime(mk('words'), 'b');
+  assert.equal(rise.time, 4.1);                        // 3.5 + 0.1 delay + 0.5 caption
+  assert.equal(words.time, 4.54);                      // 3.5 + 0.1 + 0.94
+  assert.ok(words.time >= rise.time);
+});

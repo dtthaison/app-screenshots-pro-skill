@@ -15,7 +15,7 @@ import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
 import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
-import { splitWords, wordsHtml, resolveCaptionMotion } from './kinetic.mjs';
+import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kinetic.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -591,9 +591,10 @@ async function resolvePreviews({ ffmpeg }) {
         for (const e of els) if (typeof e.screen === 'string' && isClip(e.screen)) throw new Error(`${e.screen}: a clip plays only on the scene's main device (id "device") — give ${e.id || e.type} a still`);
         // labels: badges under the caption (above a bottom caption), lined up with it, above the device edge (z 6)
         const cap = els.find((e) => e.type === 'caption');
-        const captionMotion = resolveCaptionMotion(pick.indexOf(sc0), sp, preview, vdef);
+        const capTitle = cap ? str(cap.title, locale) ?? '' : '';
+        const captionMotion = resolveCaptionMotion(pick.indexOf(sc0), sp, preview, vdef, !!capTitle);
         let words = 1;
-        if (cap) { cap.motion = captionMotion; words = Math.max(1, splitWords(str(cap.title, locale) ?? '').length); }
+        if (cap) { cap.motion = captionMotion; words = Math.max(1, wordCount(splitWords(capTitle))); }
         const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: cap?.x ?? 50, z: 6,
           y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
         scenes.push({ scene: { ...scene, labels: timed, captionMotion, words }, s, th, els, clip, overflow, labelEls });
@@ -662,7 +663,7 @@ async function applyState(state) {
       const byLine = window.__timeline.scenes.find((x) => x.id === sc.id)?.captionMotion === 'lines';
       kws.forEach((k, i) => {
         const p = units[byLine ? tops.indexOf(k.offsetTop) : i] ?? 1;
-        k.firstElementChild.style.transform = `translateY(${(1 - p) * 110}%)`;
+        k.firstElementChild.style.transform = `translateY(calc(${(1 - p) * 110}% + ${(1 - p) * 0.4}em))`;   // + the clipping box's padding, so a unit starts fully hidden
       });
       const last = units[byLine ? tops.length - 1 : kws.length - 1] ?? 1;
       for (const x of root.querySelectorAll('.kx')) { x.dataset.o0 ??= x.style.opacity || '1'; x.style.opacity = x.dataset.o0 * last; }
