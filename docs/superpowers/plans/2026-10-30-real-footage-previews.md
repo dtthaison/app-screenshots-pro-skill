@@ -726,7 +726,7 @@ test('splitWords keeps highlight state across words', () =>
 test('text without spaces is one unit (ja)', () => assert.equal(splitWords('ワンタップで入れ替え').length, 1));
 test('words: 70 ms stagger, done at 0.07*(n-1)+0.45', () => {
   const p = unitProgress('words', 0.1, 3);
-  assert.ok(p[0] > p[1] && p[1] > p[2]); assert.equal(motionLength('words', 3), 0.59);
+  assert.ok(p[0] > p[1] && p[1] > p[2]); assert.equal(+motionLength('words', 3).toFixed(3), 0.59);
   assert.deepEqual(unitProgress('words', 0.59, 3).map((x) => +x.toFixed(2)), [1, 1, 1]);
 });
 test('pop settles to scale 1 and opacity 1', () => { const v = popValue(1); assert.ok(Math.abs(v.scale - 1) < 0.01 && v.opacity === 1); });
@@ -999,7 +999,6 @@ test('price patterns across locales', () => {
 });
 test('time-sensitive: year and localized month names', () => {
   assert.ok(timeSensitive('New for 2026', 'en-US')); assert.ok(timeSensitive('Neu im Oktober', 'de'));
-  assert.ok(timeSensitive('Mới tháng mười', 'vi') || true);   // vi month names are numeric words; documented limit
   assert.equal(timeSensitive('Train 5 days a week', 'en-US'), null);
 });
 test('play phrases', () => { assert.ok(playPhrase('The #1 fitness app')); assert.equal(playPhrase('Your coach'), null); });
@@ -1027,7 +1026,7 @@ In this step:
 Run: `npm run test:unit && node scripts/render.mjs examples/preview/preview.config.json --check --locales en-US`
 Expected:
 - unit tests PASS;
-- the `--check` output ends with `checked 4 previews (no frames captured)`;
+- the `--check` output ends with `checked 3 previews (no frames captured)` (tour × preview-iphone, preview-ipad, header-video);
 - the exit code is 0;
 - no `framed-device` WARN appears for `preview-iphone` or `preview-ipad`.
 
@@ -1114,7 +1113,7 @@ git commit -m "feat(video): hand-over report per preview"
   `evals/files/*.json`.
 - Modify:
   - `SKILL.md`. Add a "Preview video" path inside step 4: brief → `recommend.mjs` → 3 storylines in words to the owner →
-    storyboard + `--check` → `record.mjs` → read `*.sheet.jpg` with the must-not-ship checklist → render → QA → hand-over.
+    storyboard + `--check` → `record.mjs` → read `*.sheet.jpg` with the must-not-ship checklist (spec §9, as checkboxes) → render → QA → hand-over.
     Also add the quick-reference rows for `concept`, `record`, `speed`, `tap`, `captionMotion` and the three layouts, and
     links to the five knowledge base files. Keep the file under 200 lines.
   - `references/config.md` (previews section): document `concept`, `record` (all step kinds), `clip.from`/`to`,
