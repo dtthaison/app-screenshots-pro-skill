@@ -44,8 +44,12 @@ Paths are relative to the config file. Coordinates for every element:
 | `wear-os` | 768×768 | Play Wear OS: 1:1, ≥ 384 px; **raw**: Google forbids frames, extra text and backgrounds |
 | `windows` / `windows-4k` / `windows-1366` | 1920×1080 / 3840×2160 / 1366×768 | Microsoft Store desktop: PNG only, ≤ 50 MB, max 10; frame `windows-window`; store `msstore` |
 | `android-phone` / `android-phone-hd` | 1080×1920 / 1440×2560 | Play phone, 2–8 per locale |
-| `android-tablet-7` / `android-tablet-10` / `chromebook` | | Play large screens, min 4 |
+| `android-tablet-7` / `android-tablet-10` / `chromebook` | | Play large screens, min 4; `chromebook` is uploaded by hand (supply has no desktop folder) |
 | `play-feature-graphic` | 1024×500 | exactly one image |
+| `android-tv` / `tv-banner` | 1920×1080 / 1280×720 | Android TV screenshots (at least 1) and the TV banner (required for TV apps, exactly one); supply uploads both |
+| `android-xr` | 3840×2400 | Android XR, 8:5, 4–8 per locale, ≤ 8 MB; uploaded by hand (supply has no XR folder) |
+| `android-auto` / `android-auto-portrait` | 1024×768 / 800×1280 | Android Automotive, ≥ 2 each; **raw** (Google wants the generic system UI only); uploaded by hand |
+| `play-promo` | 1920×1080 video | Play "preview video": 10 s–2 min (only the first 30 s autoplay). Upload the mp4 to YouTube (public or unlisted, ads off) and paste the link in Play Console |
 | `og-image`, `x-post`, `product-hunt`, `instagram`, `story` | | social promo, not uploaded |
 | `story-video` | 1080×1920 | social video, no store limits; any duration |
 

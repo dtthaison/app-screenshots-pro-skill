@@ -45,6 +45,16 @@ test('story-video has no store limits', () => {
   assert.equal(t.video.maxSec, Infinity);
   assert.deepEqual([t.w, t.h, t.store, t.max, t.video.minSec, t.video.maxMB], [1080, 1920, 'social', 99, 0, Infinity]);
 });
+test('Android TV, XR, Automotive and the Play promo video', () => {
+  for (const [id, w, h, dir, min, max] of [['android-tv', 1920, 1080, 'tvScreenshots', 1, 8], ['tv-banner', 1280, 720, 'tvBanner', undefined, 1], ['android-xr', 3840, 2400, undefined, 4, 8]]) {
+    const t = resolveTarget(id); assert.deepEqual([t.w, t.h, t.store, t.playDir, t.min, t.max, t.landscape], [w, h, 'play', dir, min, max, true]);
+  }
+  for (const [id, w, h] of [['android-auto', 1024, 768], ['android-auto-portrait', 800, 1280]]) {
+    const t = resolveTarget(id); assert.deepEqual([t.w, t.h, t.raw, t.min, t.playDir], [w, h, true, 2, undefined]);
+  }
+  const p = resolveTarget('play-promo'); assert.deepEqual([p.w, p.h, p.video.minSec, p.video.maxSec, p.video.fps, p.landscape], [1920, 1080, 10, 120, 30, true]);
+  assert.equal(isVideoTarget(p), true);
+});
 test('creative image targets', () => {
   for (const [id, w, h] of [['app-header', 3840, 1646], ['app-header-16-9', 5244, 2950], ['search-asset', 3840, 2560], ['search-asset-16-9', 5244, 2950], ['event-card', 3840, 2160], ['event-details', 2160, 3840]]) {
     const t = resolveTarget(id);

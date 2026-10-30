@@ -2,6 +2,9 @@
 
 ## 1.1.0 (2026-10-30)
 
+- Google Play: `android-tv` and `tv-banner` (supply uploads both), `android-xr` (3840×2400), `android-auto` / `android-auto-portrait` (raw system UI), and `play-promo`, a 1920×1080 video for the YouTube preview link.
+- Fix: HTML mock screens on frameless Play targets (`chromebook`, now also `android-tv`, `android-xr`) rendered black because the mock was queued for the wrong frame; they now render for the Android frame.
+- Previews open on a complete first scene and loop with a cut by default; `loop: "soft"` restores the fade through the background.
 - App previews: `previews` in the config renders `.mp4` videos (H.264 High, 30 fps, stereo AAC, faststart) for `preview-iphone`, `preview-iphone-16-9`, `preview-iphone-4.7`, `preview-ipad`, `preview-ipad-9.7` and `preview-mac`.
   - Scenes take stills, HTML mocks or screen recordings (`clip`, with `{locale}` and `clipLocale`), `motion` (drift, scroll, none), timed `labels`, `in`, `transition` (crossfade, push, cut, fade-through) and continuity between scenes with the same layout.
   - Hard loop by default (`loop: "soft"` fades through the background), `music`, `poster` (seconds or a scene id) with a `.poster.png`, a filmstrip in `_preview/`, and a `<video>` per file in `index.html`.
