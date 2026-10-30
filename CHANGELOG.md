@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Showcase: a real app sample (AptusFIT) with 31 options in 12 languages, previewed as App Store and Google Play listings, at `docs/samples/aptusfit/`.
+
 ## 1.0.1 (2026-10-29)
 
 - `theme.caption.titleSize`, `subtitleSize` and `eyebrowSize` now apply to every slide. Before, each layout's own default size overrode them. A slide's own `caption` sizes still take priority.

@@ -6,6 +6,8 @@ A Claude Code skill that turns your app into App Store and Google Play screensho
 
 **Showcase:** [dtthaison.github.io/app-screenshots-pro-skill](https://dtthaison.github.io/app-screenshots-pro-skill/) has every layout, panorama pattern, device and language, rendered by the skill.
 
+**Real app sample:** [AptusFIT](https://dtthaison.github.io/app-screenshots-pro-skill/samples/aptusfit/) shows 31 options for one shipping app in 12 languages, previewed as App Store and Google Play listings.
+
 ## What it does
 
 - **Reads your app.** Name, features, brand colors, fonts and existing translations come from the code: iOS, Android, Flutter, React Native, Expo or web.
