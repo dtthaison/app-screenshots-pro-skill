@@ -266,7 +266,9 @@ function elementHtml(el, ctx, locale) {
     case 'caption': return captionHtml(el, ctx, locale);
     case 'device': {
       const src = resolveScreen(el.screen, locale, el.screenModel || el.model, el.landscape, { fullPage: !!el.fullPage });
-      const meta = src ? imageMeta.get(src) : null;
+      // a full-page (scrolling) screen still gives the device its one-viewport shape (frameless / window frames use it)
+      const shape = el.fullPage ? resolveScreen(el.screen, locale, el.screenModel || el.model, el.landscape) : src;
+      const meta = shape ? imageMeta.get(shape) : null;
       return renderDevice({ ...el, src: src ? pathToFileURL(src).href : null, imageAspect: meta?.aspect }, ctx);
     }
     case 'text': {
@@ -477,9 +479,12 @@ function autoModel(e, target, locale) {
 // One page per preview × video target × locale with every scene's DOM stacked (later scenes paint above), each in
 // its own .slide so __fit's safe-area check measures it. Node computes stateAt(tl, t); window.__apply(state) shows it.
 const isClip = (p) => /\.(mov|mp4|m4v|webm)$/i.test(p);
-// elementHtml's default z-index per type: each element sits in an animated wrapper (a stacking context), so the
-// wrapper takes the element's z and the layering matches the still slide
-const TYPE_Z = { caption: 3, device: 2, arrow: 5, band: 1, ribbon: 1, callout: 8 };
+// elementHtml's default z-index for the animated roles: their wrappers get a transform/opacity (a stacking context),
+// so the wrapper takes the element's z and the layering matches the still slide. 'other' wrappers get no z-index, so
+// their children (blend shapes, two-part callouts) stack and blend in the scene exactly as on the still.
+const ROLE_Z = { device: 2, caption: 3, label: 4 };
+
+const clipFile = (src, locale) => { const c = screenCands(src.split('?')[0], locale).find((x) => fs.existsSync(abs(x.file))); return c ? abs(c.file) : null; };
 
 async function loadImageMeta(srcs, locale) {
   for (const src of srcs) {
@@ -537,19 +542,26 @@ async function resolvePreviews({ ffmpeg }) {
           const rel = path.relative(BASE, info.file);
           if (!ex.count) throw new Error(`clip ${rel} gave no frames between ${start}s and ${end}s`);
           if (ex.count / ex.fps < dur - 1 / ex.fps) warnSet.add(`clip ${rel} is ${(ex.count / ex.fps).toFixed(1)}s but scene "${scene.id}" lasts ${dur}s — the last frame holds`);
-          const ms = MODELS[dev.model]?.screen, want = ms && (dev.landscape ? 1 / ms : ms);
+          const ms = MODELS[dev.model]?.screen, want = dev.screenAspect || (ms && (dev.landscape ? 1 / ms : ms));
           if (want && Math.abs(info.height / info.width / want - 1) > 0.02) warnSet.add(`clip ${info.width}×${info.height} does not match the ${dev.model} screen (${want.toFixed(2)}:1) — it will be cropped`);
-          dev.screen = ex.files[0];
+          // every element showing the clip (device2 / zoom / lens fall back to slide.screen, or name it) gets the first frame
+          for (const e of els) if (e.screen === info.file || (typeof e.screen === 'string' && isClip(e.screen) && clipFile(e.screen, locale) === info.file)) e.screen = ex.files[0];
           dev.clipFrames = ex.files.map(fileUrl);
           imageMeta.set(ex.files[0], imageMeta.get(info.file));
           clip = { frames: ex.count, fps: ex.fps };
         } else if (scene.motion === 'scroll' && dev) {
           // the whole mock / long capture pans inside the screen; overflow = how much taller than the screen it is
+          // measured against the aspect the device shows: its screenAspect, the model's screen, else (frameless, windows)
+          // the one-viewport render of the same screen
           dev.fullPage = true;
-          const full = resolveScreen(dev.screen, locale, dev.screenModel || dev.model, dev.landscape, { fullPage: true });
-          const a = full && imageMeta.get(full)?.aspect, ms = MODELS[dev.model]?.screen;
-          overflow = a && ms ? a / ms - 1 : 0;
+          const sm = dev.screenModel || dev.model;
+          const full = resolveScreen(dev.screen, locale, sm, dev.landscape, { fullPage: true });
+          const one = resolveScreen(dev.screen, locale, sm, dev.landscape);
+          const a = full && imageMeta.get(full)?.aspect;
+          const shown = dev.screenAspect || MODELS[dev.model]?.screen || (one && imageMeta.get(one)?.aspect);
+          overflow = a && shown ? a / shown - 1 : 0;
         }
+        for (const e of els) if (typeof e.screen === 'string' && isClip(e.screen)) throw new Error(`${e.screen}: a clip plays only on the scene's main device (id "device") — give ${e.id || e.type} a still`);
         // labels: badges under the caption (above a bottom caption), faded in and out by the timeline
         const cap = els.find((e) => e.type === 'caption');
         const labelEls = timed.map((l, k) => ({ type: 'badge', id: `label-${k}`, text: l.text, x: 50,
@@ -586,7 +598,8 @@ function sceneHtml(job, { s, th, els, labelEls }, i) {
   const veil = isObj(bg) && bg.color ? bg.color : typeof bg === 'string' && !/gradient|url\(/i.test(bg) ? bg : '#000';
   const wrap = (e, n) => {
     const role = e.role || (e.type === 'device' ? 'device' : e.type === 'caption' ? 'caption' : 'other');
-    return `<div class="anim" data-role="${role}" data-i="${role === 'label' ? e.i : n}" style="position:absolute;inset:0;z-index:${e.z ?? TYPE_Z[e.type] ?? 4}">${elementHtml(e, ctx, locale)}</div>`;
+    const z = role === 'other' ? '' : `;z-index:${e.z ?? ROLE_Z[role]}`;
+    return `<div class="anim" data-role="${role}" data-i="${role === 'label' ? e.i : n}" style="position:absolute;inset:0${z}">${elementHtml(e, ctx, locale)}</div>`;
   };
   return `<div class="scene" data-scene="${esc(s.id)}" data-n="${i}" style="position:absolute;inset:0;visibility:hidden;opacity:0">${backgroundHtml(bg, W, H)}${[...els, ...labelEls].map(wrap).join('')}<div class="veil" style="position:absolute;inset:0;background:${veil};opacity:0;z-index:9999"></div></div>`;
 }
