@@ -6,6 +6,7 @@
   - Scenes take stills, HTML mocks or screen recordings (`clip`, with `{locale}` and `clipLocale`), `motion` (drift, scroll, none), timed `labels`, `in`, `transition` (crossfade, push, cut, fade-through) and continuity between scenes with the same layout.
   - Loop fades (or `loop: "hard"`), `music`, `poster` (seconds or a scene id) with a `.poster.png`, a filmstrip in `_preview/`, and a `<video>` per file in `index.html`.
   - Checks: duration 15–30 s, up to 3 per size and locale, 500 MB, poster in a transition, clip length and aspect, "draft" notes for stills.
+  - Scene times are rounded to the millisecond (3 + 3.4 + 11.8 + 11.8 is exactly 30 s), and duration and count are checked before capture, so an out-of-range preview is never rendered.
   - `--previews`, `--scenes`, `--no-previews`, `--only-previews`; `--supersample` and `videoSupersample` for both passes; `renderScale` for drafts.
   - `--fastlane` writes `out/fastlane/app-previews/<locale>/NN_<IDENT>_<id>.mp4` for `deliver`.
 - Creative assets: images `app-header`, `app-header-16-9`, `search-asset`, `search-asset-16-9`, `event-card`, `event-details` and videos `header-video`, `search-video`, `event-card-video`, `event-details-video` (1 per locale; safe-area warning; png-only check). Fastlane copies go to `out/fastlane/creative/`.

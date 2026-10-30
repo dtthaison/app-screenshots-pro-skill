@@ -66,9 +66,9 @@ Paths are relative to the config file. Coordinates for every element:
 
 | image id | px | video id | video |
 |---|---|---|---|
-| `app-header` | 3840×1646 (21:9), png or jpeg | `header-video` | same size, 5–30 s |
+| `app-header` | 3840×1646 (21:9), png or jpeg | `header-video` | same size, 5–30 s; muted by default, can be unmuted |
 | `app-header-16-9` | 5244×2950, **png only** | | |
-| `search-asset` | 3840×2560 (3:2), png or jpeg | `search-video` | same size, 5–30 s; muted by Apple, cannot be unmuted |
+| `search-asset` | 3840×2560 (3:2), png or jpeg | `search-video` | same size, 5–30 s; cannot be unmuted |
 | `search-asset-16-9` | 5244×2950, **png only** | | |
 | `event-card` | 3840×2160 (16:9) | `event-card-video` | same size, 15–30 s |
 | `event-details` | 2160×3840 (9:16) | `event-details-video` | same size, 15–30 s |
@@ -365,11 +365,11 @@ App previews (the video that plays **first** on the App Store product page) and 
 
 Defaults for every preview come from `theme.video`: `{ "entrance": "rise", "transition": "crossfade", "scroll": { "speed": 1 } }` (`scroll.speed` is accepted but not used yet: a scroll always spans the scene). Merge order: `theme.video` < preview < scene.
 
-**Always an audio track.** Every file has a stereo AAC track, silent unless `music` is set, because App Store Connect rejects a video with no audio track and simulator recordings have none. Header videos are muted on the store and search videos cannot be unmuted, so nothing in a creative video may depend on sound (`music` on `search-video` warns). Music is cut to the video length and faded out with `fadeOut` seconds.
+**Always an audio track.** Every file has a stereo AAC track, silent unless `music` is set, because App Store Connect rejects a video with no audio track and simulator recordings have none. Product page header videos are muted by default and can be unmuted; search results videos cannot be unmuted. Nothing in a creative video may depend on sound (`music` on `search-video` warns). Music is cut to the video length and faded out with `fadeOut` seconds.
 
 **Encoding.** H.264 High, 30 fps, yuv420p, `.mp4` with faststart; Level 4.0 at 11 Mbps for the app preview sizes, a higher level and 20 Mbps for the 4K creative videos (picked automatically from the frame size).
 
-**ffmpeg** is looked up as `FFMPEG_PATH`, then the bundled `ffmpeg-static`, then `ffmpeg` on `PATH`. `ffmpeg-static` is an optional dependency: `npm install` downloads its ffmpeg binary (GPL-3.0) at install time; this repo is MIT and does not redistribute it. With no binary the renderer prints `ERROR previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg`. A `FFMPEG_PATH` that does not exist is its own ERROR.
+**ffmpeg** is looked up as `FFMPEG_PATH`, then the bundled `ffmpeg-static`, then `ffmpeg` on `PATH`. `ffmpeg-static` is an optional dependency: `npm install` downloads its ffmpeg binary (GPL-3.0) at install time; this repo is MIT and does not redistribute it. With no binary the renderer prints `ERROR previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg — or run with --no-previews`. A `FFMPEG_PATH` that does not exist is its own ERROR. Either way the screenshot pass still renders and the run exits 1.
 
 ### Scenes
 
@@ -394,13 +394,13 @@ A scene is a slide plus time. Every slide field works (`layout`, `eyebrow/title/
 ```
 
 - **Timing.** Durations include the transition into the next scene (a 0.5 s crossfade overlaps the end of scene n and the start of n+1), so the total is the sum of the durations. Transition lengths are fixed: crossfade 0.5 s, push 0.6 s (new scene slides in from the right), fade-through 0.6 s (to the background color and back), cut 0. A scene must be longer than its transitions.
-- **Duration limits.** App previews 15–30 s; header and search videos 5–30 s; In-App Event videos 15–30 s. Outside the range the renderer errors (it does not cut) and prints the sum: `preview is 9s; preview-iphone wants 15–30s`. Pick the scenes for a shorter target with `byTarget.<target>.scenes`. Count per target × locale: up to 3 previews for the Apple preview targets, 1 for creative targets and images.
+- **Duration limits.** App previews 15–30 s; header and search videos 5–30 s; In-App Event videos 15–30 s. Outside the range the renderer errors before capture (it does not cut, and nothing is rendered for that preview) and prints the sum: `preview is 9s; preview-iphone wants 15–30s`. Scene times are rounded to the millisecond, so `3 + 3.4 + 11.8 + 11.8` is exactly 30 s. `duration` must be a number of seconds (`"7"` is an ERROR). Pick the scenes for a shorter target with `byTarget.<target>.scenes`. Count per target × locale: up to 3 previews for the Apple preview targets, 1 for creative targets and images; the extras are not rendered (`preview-iphone|en-US: 4 previews, store max is 3`).
 - **Stills.** `drift` is a slow 3% zoom (the default); `none` is static; `scroll` pans the screen from top to bottom inside the device and needs content taller than the screen. A mock with `motion: "scroll"` is rendered full-page. When the still does not overflow the device screen by more than 2%, `scroll` falls back to `drift`.
 - **Clips.** A recording is cut into frames once (30 fps, cached under `out/.build/clips/`) and played on the scene's **main device** only (id `device`; a clip on another element is an ERROR). `{locale}` resolves like a screen. A clip shorter than the scene holds its last frame (WARN `clip … is 2.0s but scene "x" lasts 4s — the last frame holds`). A clip longer than the scene is cut at `clip.end` or the scene end. A clip whose aspect is more than 2% off the device screen is cropped to fill (WARN `clip 400×960 does not match the iphone screen`): record on the same device class as the frame.
-- **Continuity.** When two consecutive scenes share the layout and the main device's position, the device stays put (no re-entrance) and only the caption, labels and screen change. One long recording cut with `clip.start`/`end` into several scenes with their own captions becomes chapters.
+- **Continuity.** When two consecutive scenes share the layout and the main device's position, the device stays put (no re-entrance) and only the caption, labels and screen change. One long recording cut with `clip.start`/`end` into several scenes with their own captions becomes chapters. Continuity is meant for `crossfade` and `cut`; with `push` the whole scene slides in while the device stays put, which contradicts itself, so pick another transition between continuous scenes.
 - **Labels.** A badge under the caption (above it for bottom captions), aligned with the caption's x, in the theme accent; `at`/`until` are seconds from the scene start, fading in and out over 0.3 s. Only object labels are timed; the `before-after` layout keeps its own string `labels`.
 - **Entrance and loop.** `in: "rise"`: the device rises 6% while fading in over 0.6 s, the caption follows 0.1 s later over 0.5 s; `fade` is the same without the rise; `none` shows both at once. Scene 1 fades in from the background color over 0.4 s and the last scene fades out to it over 0.6 s, so the loop point has no jump (the store autoplays previews on a loop). `"loop": "hard"` on the preview turns both fades off, for authors who cut on purpose.
-- **Recording per locale.** `clipLocale: "en-US"` declares that the other locales use the en-US recording and silences the warning `[ja] no recording for this locale — using en-US; UI language in the recording does not match`. Without it the warning stays, because Apple wants the UI in the store language.
+- **Recording per locale.** `clipLocale: "en-US"` declares that the other locales use the en-US recording and silences the warning `[ja] no recording for this locale — using en-US; UI language in the recording does not match`. Without it the warning stays, because Apple wants the UI in the store language. It prints once per preview × target × locale, however many scenes use the fallback recording.
 - **`byTarget.scenes`.** A list of scene ids picks and orders the preview's own scenes for that target (an unknown id is an ERROR); a list of scene objects replaces them. Use it so the 21:9 header carries only the one flow that sells the app.
 
 ### Creative videos
@@ -409,13 +409,13 @@ The header, search and In-App Event videos are the same `previews[]` entry with 
 
 The example's three tweaks are specific to its content; do not copy them blindly:
 
-- `"poster": "stats"` takes the poster from that scene's rest frame instead of the 5 s default, which would land in a transition between short scenes.
+- `"poster": "stats"` takes the poster from that scene's rest frame instead of the 5 s default, which would land in that scene's entrance.
 - `byTarget.header-video.caption` on the stats scene moves the caption (`y: 14, h: 44`) so labels stay inside the 21:9 header's safe area.
 - `"caption": { "h": 13 }` on the stats scene makes the caption box shorter, so the label badge sits above the phone instead of on its top edge.
 
 ### Poster frame
 
-App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:10"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
+App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest, kept inside the scene and before the next scene starts covering it). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:10"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
 
 ## CLI
 
@@ -429,7 +429,7 @@ Exit code 0 = clean; 1 = validation errors (wrong size, alpha, too many files, o
 Outputs: `out/<target>/<locale>/NN_<id>.png`, `out/_preview/*.jpg` contact sheets (rows of 6, for QA),
 `out/index.html` (full-resolution gallery with slide + layout labels), `out/manifest.json`,
 and with `--fastlane`: `out/fastlane/screenshots/<asc-locale>/` + `out/fastlane/metadata/android/<play-locale>/images/...`.
-Previews add `out/<target>/<locale>/NN_<id>.mp4` and `NN_<id>.poster.png`; a filmstrip `out/_preview/<target>__<locale>__<id>.jpg` (one frame per second, numbered; read it); and in `index.html` a `<video>` per file. With `--fastlane`: `out/fastlane/app-previews/<asc-locale>/NN_<IDENT>_<id>.mp4` (for example `01_IPHONE_67_tour.mp4`), which `fastlane deliver` uploads (identifiers `IPHONE_67`, `IPHONE_55`, `IPHONE_47`, `IPAD_PRO_3GEN_129`, `IPAD_97`, `DESKTOP`); creative files go to `out/fastlane/creative/<asc-locale>/` and are uploaded by hand in App Store Connect.
+Previews add `out/<target>/<locale>/NN_<id>.mp4` and `NN_<id>.poster.png`; a filmstrip `out/_preview/<target>__<locale>__<id>.jpg` (one frame per second, numbered; read it); and in `index.html` a `<video>` per file. With `--fastlane`: `out/fastlane/app-previews/<asc-locale>/NN_<IDENT>_<id>.mp4` (for example `01_IPHONE_67_tour.mp4`), which `fastlane deliver` uploads (identifiers `IPHONE_67`, `IPHONE_55`, `IPHONE_47`, `IPAD_PRO_3GEN_129`, `IPAD_97`, `DESKTOP`); creative files (images and videos) go to `out/fastlane/creative/<asc-locale>/<baseId>_<slide-or-preview-id>.<ext>` (for example `app-header_header.png`, `header-video_tour.mp4`) and are uploaded by hand in App Store Connect. A preview with an ERROR (duration, count, size) is not copied and not listed in `manifest.json`.
 A filtered run (`--targets`, `--previews`, `--scenes`, `--slides`) rewrites `manifest.json` and `index.html` with only that run's output.
 Render time: about 1–2 minutes per preview per locale on a laptop, 3–5 minutes for a 4K creative video.
 Set `CHROME_PATH` if Chrome isn't installed in the default place.

@@ -5,81 +5,77 @@ description: Use when making App Store or Google Play screenshots, store listing
 
 # Generating App Screenshots
 
-Code-driven App Store / Play screenshots and app preview videos: one JSON config → every store size × every locale, rendered by headless Chrome
-(`scripts/render.mjs`). Frames are drawn in CSS (real / clay / outline / frameless, any color, 3D tilt), so nothing needs
-downloading. Output is validated against store rules (exact size, no alpha, count and duration limits). Videos are encoded with ffmpeg.
+One JSON config → App Store / Play screenshots and app preview videos for every store size × locale, rendered by headless Chrome
+(`scripts/render.mjs`) and ffmpeg, with CSS device frames and store-rule checks (size, alpha, count, duration).
 
-**Core principle:** screenshots sell *benefits*, not screens. Read the app first, write captions from what users get, then render, look at every preview, and fix.
+**Core principle:** screenshots sell *benefits*, not screens. Read the app, caption what users get, render, check every preview, fix.
 
 ## Workflow
 
 1. **Read the app** → name, value props, top 4–6 features, brand colors, fonts, supported locales, existing translations.
-   Where to look per stack: [references/reading-the-app.md](references/reading-the-app.md).
-2. **Get raw screens**, best first: (a) real captures from simulator/emulator per locale (commands in reading-the-app.md);
-   (b) user-supplied PNGs; (c) HTML mock screens rebuilt from the app's UI code (`screens/*.html`, read `?locale=` to localize);
-   (d) screen recordings for previews (reading-the-app.md §2b).
-   Never invent features the app doesn't have.
+   Per stack: [references/reading-the-app.md](references/reading-the-app.md).
+2. **Get raw screens**, best first: (a) simulator/emulator captures per locale (commands: reading-the-app.md);
+   (b) user-supplied PNGs; (c) HTML mocks rebuilt from the app's UI code (`screens/*.html`, read `?locale=`);
+   (d) screen recordings for previews (reading-the-app.md §2b). Never invent features the app lacks.
 3. **Write copy + translations** → `copy.json`. Rules and locale codes: [references/copy-and-locales.md](references/copy-and-locales.md).
-4. **Write `screenshots.config.json`** — schema, layouts, elements: [references/config.md](references/config.md).
+4. **Write `screenshots.config.json`** ([references/config.md](references/config.md)).
    Start from `examples/demo/screenshots.config.json` (normal set), `examples/demo/panorama.config.json` (connected set),
-   or copy slides from `examples/gallery/layouts.config.json` — one slide for every layout × preset (open `examples/gallery/out/index.html` to see them).
-   Pick a `theme.preset` that matches the brand, then vary `preset`/`layout` per slide for rhythm.
-   Add `previews` when the app ships a preview (start from `examples/preview/`). The preview shows **first** on the store, so scene 1 and the poster carry the hook.
+   or copy slides from `examples/gallery/layouts.config.json` (every layout × preset).
+   Pick a brand-matching `theme.preset`; vary `preset`/`layout` per slide for rhythm.
+   Add `previews` for a preview video (start from `examples/preview/`). It plays **first** on the store, so scene 1 and the poster carry the hook.
 5. **Render:**
    ```bash
    cd <skill-dir> && [ -d node_modules ] || npm install --no-fund --no-audit
    node <skill-dir>/scripts/render.mjs path/to/screenshots.config.json [--locales en-US,vi] [--targets ios-6.9] [--slides hero] [--fastlane] [--previews tour] [--scenes hero,stats]
    ```
-   Iterate on one locale + one target, then run everything. Previews take about 1–2 minutes each per locale (3–5 for 4K creative videos): iterate with `--scenes`, `--only-previews`, `"renderScale": 0.5`.
-6. **QA — required.** Read every `out/_preview/<target>__<locale>.jpg` image (they're contact sheets; `out/index.html` shows them all).
-   Re-render until every box is true:
-   - [ ] exit code 0, no `ERROR` / `WARN` lines
+   Iterate on one locale and target, then run all. A preview takes 1–2 min per locale (4K: 3–5): iterate with `--scenes`, `--only-previews`, `"renderScale": 0.5`.
+6. **QA — required.** Read every `out/_preview/<target>__<locale>.jpg` contact sheet; play the videos in `out/index.html`.
+   Re-render until all are true:
+   - [ ] exit code 0, no `ERROR` / `WARN` lines; `NOTE` lines read too (draft previews, poster time, clips)
    - [ ] no caption clipped, covered by a device, or visibly smaller than its siblings
-   - [ ] every device screen is **full**, with no big empty area under the content (add realistic rows/data to the screen)
-   - [ ] no missing glyphs: `#`, `?`, or empty boxes where icons or CJK/Thai/Arabic text should be
+   - [ ] every device screen is **full**, no big empty area under the content (add realistic rows/data)
+   - [ ] no missing glyphs (`#`, `?`, empty boxes) in icons or CJK/Thai/Arabic text
    - [ ] highlights land on the benefit words in every locale; RTL locales read right to left
-   - [ ] UI strings inside screens are translated too, and correct (plurals, number/date formats)
-   - [ ] previews: read every `_preview/*__<id>.jpg` filmstrip; the poster frame is readable alone; nothing is still moving at the loop point; clips are not stretched; labels are timed right in every locale
-7. **Deliver:** report the output folder, the targets × locales rendered, and what still needs a human:
-   native-speaker review; **if HTML mocks were used, say they must be replaced by real captures before App Store submission**;
-   for previews: the files, the poster time to set in App Store Connect (or the `preview_frame_time_code` the report prints), and a draft notice when scenes are stills or mocks;
-   app bugs you noticed while reading the code (e.g. broken plurals), reported, not silently baked into the screenshots.
-   `--fastlane` also writes `out/fastlane/` for `fastlane deliver` / `supply` upload (`out/.build/` is scratch; ignore it).
+   - [ ] UI strings in screens are translated and correct (plurals, number/date formats)
+   - [ ] previews: read every `_preview/*__<id>.jpg` filmstrip; the poster frame reads alone; nothing moves at the loop point; clips are not stretched; labels are timed right in every locale
+7. **Deliver:** report the output folder, targets × locales, and what still needs a human:
+   native-speaker review; **if HTML mocks were used, say real captures must replace them before App Store submission**;
+   for previews: the files, the poster time for App Store Connect, a draft notice when scenes are stills or mocks;
+   app bugs noticed in the code (e.g. broken plurals), reported, not baked into the screenshots.
+   `--fastlane` writes `out/fastlane/` for `deliver` / `supply`: screenshots and app previews (`deliver` takes one `preview_frame_time_code` per upload, so give all previews the same poster time); creative assets go to `out/fastlane/creative/` for manual upload in App Store Connect. `out/.build/` is scratch.
 
 ## Quick reference
 
 | Need | Config |
 |---|---|
-| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); Mac `mac`; Windows `windows`; watch `watch-ultra`, `wear-os` (raw UI; Apple Watch may take `@styled`) |
+| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); `mac`, `windows`, `watch-ultra` (raw; `@styled`), `wear-os` (raw) |
 | Device frames | `"device": { "model": "iphone\|iphone-notch\|iphone-home\|ipad\|android\|android-flat\|android-tablet\|apple-watch\|wear-os\|macbook\|desktop\|mac-window\|windows-window\|browser\|none" }` — `examples/devices/` |
-| Cross-device | layouts `phone-watch` `watch-hero` `laptop-phone`; slide `targets: ["watch"]` / `["desktop"]` to give a family its own slides |
-| Layout (41) | device: `text-top text-bottom hero device-hero screen-hero tilt-left tilt-right corner frameless landscape` · multi: `two-devices three-devices phone-tablet before-after mosaic` · callouts: `pop-out metric annotated` · proof/info: `feature-grid steps stats review awards split-photo caption-only` · wide: `text-left text-right` · `caption-top` (caption band only) · `blank` · **signature**: `spotlight big-type ticker arch orbit lens layers notify deck` (see `examples/signature/`) |
+| Cross-device | layouts `phone-watch` `watch-hero` `laptop-phone`; family slides with `targets: ["watch"]` / `["desktop"]` |
+| Layout (41) | `text-top text-bottom hero device-hero screen-hero tilt-left tilt-right corner frameless landscape` · `two-devices three-devices phone-tablet before-after mosaic` · `pop-out metric annotated` · `feature-grid steps stats review awards split-photo caption-only` · wide `text-left text-right` · `caption-top` `blank` · **signature** `spotlight big-type ticker arch orbit lens layers notify deck` (`examples/signature/`) |
 | Colors | `"preset": "aurora\|midnight\|sunset\|ocean\|forest\|mint\|paper\|candy\|citrus\|lilac\|coral\|mono"` on theme or slide |
 | Device color / style | `"device": { "style": "real\|clay\|outline\|frameless", "color": "natural-titanium" \| "#hex" }` |
-| Background | string CSS, or `{ color, gradient, mesh[], image, overlay, pattern, noise, scene }`; `scene`: ridge/waves/dunes/aurora/stars landscape |
-| Highlight words | `"**one tap**"` in copy + `theme.highlight` (or per slide `"highlight"`): `style: color \| marker \| underline \| gradient`, `color` |
+| Background | CSS string, or `{ color, gradient, mesh[], image, overlay, pattern, noise, scene }` (`scene`: ridge/waves/dunes/aurora/stars) |
+| Highlight words | `"**one tap**"` in copy + `theme.highlight` (or slide `"highlight"`): `style: color\|marker\|underline\|gradient`, `color` |
 | Per-size / per-language tweak | `"byTarget": { "ipad-13": {...} }`, `"byLocale": { "de": {...} }` on slides or elements |
 | Slide only on some sizes | `"targets": ["ios"]` / `"skipTargets": ["play-feature-graphic"]` |
-| Phone spanning 2 slides | top-level `"panorama"` + element `"seam": 2` (border of slides 2\|3), `"dx"` nudge, `"slide": n` for slide-relative x — see `examples/gallery/panorama.config.json` |
-| Ready-made panorama | `"panorama": { "pattern": ... }`: signature `wave-ride timeline giant-word constellation stage ticker` (no device cut), classic `flow peek cascade zigzag bridge crossing landscape-lay scatter giant` (safest first); slide 1 always stands alone; check `_preview/*__store.jpg` (cards with gaps) — see `examples/panorama-patterns/` |
-| Elements | `badge` `zoom` (magnified crop) `callout` `arrow` `card` `stars` `laurel` `shape` `image` `text` |
-| Preview videos | targets `preview-iphone` `preview-iphone-16-9` `preview-iphone-4.7` `preview-ipad` `preview-ipad-9.7` `preview-mac`: 15–30 s, max 3 per size and locale; `--fastlane` → `out/fastlane/app-previews/` |
+| Phone spanning 2 slides | `"panorama"` + element `"seam": 2` (slides 2\|3), `"dx"` nudge, `"slide": n` — `examples/gallery/panorama.config.json` |
+| Ready-made panorama | `"panorama": { "pattern": ... }`: `wave-ride timeline giant-word constellation stage ticker` (no device cut), `flow peek cascade zigzag bridge crossing landscape-lay scatter giant` (safest first); check `_preview/*__store.jpg` — `examples/panorama-patterns/` |
+| Elements | `badge` `zoom` (crop) `callout` `arrow` `card` `stars` `laurel` `shape` `image` `text` |
+| Preview videos | targets `preview-iphone` `preview-iphone-16-9` `preview-iphone-4.7` `preview-ipad` `preview-ipad-9.7` `preview-mac`: 15–30 s, max 3 per size and locale |
 | Creative assets | images `app-header` `search-asset` `event-card` `event-details` (+ `-16-9`, png only), videos `header-video` `search-video` `event-card-video` `event-details-video`: 1 per locale; wide slides need `"targets": ["creative"]` |
-| `previews` | `[{ id, targets, music, poster, transition, loop, clipLocale, byTarget, scenes: [{ id, layout, title, screen (still, mock or clip), duration, clip, motion, labels, in, transition }] }]` — config.md → previews |
+| `previews` | `id targets music poster transition loop clipLocale byTarget scenes` — [config.md → previews](references/config.md#previews) |
 | Mock screen states | `"screen": "screens/stats.html?state=before"` (query reaches the mock) |
 
 ## Common mistakes
 
 - **Captions describe UI** ("Settings screen") → write the benefit ("Your data stays on your device").
-- **One locale checked** → German/French/Russian run long, CJK short; the renderer auto-shrinks text and warns below 90% — shorten the copy rather than accept small text.
-- **iPhone screenshot on an iPad target** → `model: "auto"` picks the frame from the screenshot's aspect, so the iPad slot shows a phone. Capture real iPad screens; Apple rejects stretched phone UI.
-- **Ignoring `WARN text is covered`** → a device sits on top of the caption; move one.
-- **Feature graphic gets every slide** → mark other slides `"skipTargets": ["play-feature-graphic"]`.
-- **Captions or frames on watch store shots** → Wear OS rejects them, so `wear-os` renders the bare UI. Apple masks watch shots itself: `watch-*` is bare by default, and `watch-ultra@styled` adds background and a short caption. Framed watches belong in phone slides (`phone-watch`) or social images.
-- **Phone slides leaking into watch/Mac/Windows targets** → give each family its own slides with `"targets": ["watch"]` / `["desktop"]`, and `"skipTargets"` on the phone ones.
-- **Fonts missing a script** → the renderer adds Noto fonts for ja/ko/zh/ar/he/th/hi automatically; keep `font.weights` to weights the Google font has.
-- **Preview over 30 s** (or under 15) → the renderer errors with the sum; shorten scene `duration`s or pick scenes per target with `byTarget.<target>.scenes`.
-- **Fast cuts** → give each screen about 3–5 s; viewers must read the caption.
-- **Stills-only preview submitted as final** → Apple wants the main flow recorded (§2b); the renderer's "draft" NOTE means exactly this.
-- **Clip in the wrong language** → one recording per locale, or `clipLocale` plus a note that the UI language does not match.
-- **Music on a search video** → search results videos play muted; header videos too by default.
+- **One locale checked** → German/French/Russian run long; the renderer shrinks text and warns below 90% — shorten the copy.
+- **iPhone screenshot on an iPad target** → `model: "auto"` frames by aspect, so the iPad slot shows a phone; capture real iPad screens.
+- **Ignoring `WARN text is covered`** → a device sits on the caption; move one.
+- **Feature graphic gets every slide** → `"skipTargets": ["play-feature-graphic"]` on the others.
+- **Captions or frames on watch store shots** → Wear OS rejects them; `wear-os` and `watch-*` render bare UI (`@styled` adds background and a short caption on Apple Watch). Framed watches go in `phone-watch`.
+- **Phone slides leaking into watch/Mac/Windows** → own slides per family (`"targets": ["watch"]` / `["desktop"]`), `"skipTargets"` on phone ones.
+- **Fonts missing a script** → Noto fonts for ja/ko/zh/ar/he/th/hi are added automatically; keep `font.weights` to ones the font has.
+- **Preview over 30 s, or fast cuts** → an ERROR before capture; give each scene 3–5 s, pick scenes per target with `byTarget.<target>.scenes`.
+- **Stills-only or wrong-language preview as final** → Apple wants the main flow recorded in the store language (§2b): one recording per locale, or `clipLocale` and say so; the "draft" NOTE means this.
+- **Relying on sound** → Product page header videos are muted by default and can be unmuted; search results videos cannot be unmuted. Nothing in a creative video may depend on sound.
