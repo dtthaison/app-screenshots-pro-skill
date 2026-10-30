@@ -4,14 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
+import { findFfmpeg } from './video.mjs';
 import { LAYOUTS, LAYOUT_INFO } from './layouts.mjs';
 
 const SKILL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EX = path.join(SKILL, 'examples');
-const FFMPEG = createRequire(import.meta.url)('ffmpeg-static');
 const argOut = process.argv.indexOf('--out');
 const OUT = path.resolve(argOut > 0 ? process.argv[argOut + 1] : path.join(SKILL, '../../docs'));
 const SHOTS = path.join(OUT, 'shots');
@@ -30,6 +29,11 @@ const manifest = (dir) => {
   const f = path.join(EX, dir, 'manifest.json');
   if (!fs.existsSync(f)) throw new Error(`Missing ${path.relative(SKILL, f)}: run \`npm run examples\` first`);
   return JSON.parse(fs.readFileSync(f, 'utf8')).files.map((m) => ({ ...m, src: path.join(EX, dir, m.file) }));
+};
+const previewList = (dir) => {
+  const f = path.join(EX, dir, 'manifest.json');
+  if (!fs.existsSync(f)) throw new Error(`Missing ${path.relative(SKILL, f)}: run \`npm run example:preview\` first`);
+  return JSON.parse(fs.readFileSync(f, 'utf8')).previews ?? [];
 };
 const pick = (dir, target, locale = 'en-US') => manifest(dir).filter((m) => m.target === target && m.locale === locale);
 
@@ -59,7 +63,11 @@ function video(src, dest, { maxMB = 3, width, bitrate }) {
   const to = path.join(OUT, dest);
   fs.mkdirSync(path.dirname(to), { recursive: true });
   if (fs.statSync(src).size <= maxMB * 1048576) fs.copyFileSync(src, to);
-  else execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', src, '-vf', `scale=${width}:-2`, '-c:v', 'libx264', '-b:v', bitrate, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'copy', to]);
+  else if (fs.existsSync(to) && fs.statSync(to).mtimeMs > fs.statSync(src).mtimeMs) { /* up to date */ } else {
+    const ffmpeg = findFfmpeg();
+    if (!ffmpeg) throw new Error('Previews section needs ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg');
+    execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', src, '-vf', `scale=${width}:-2`, '-c:v', 'libx264', '-b:v', bitrate, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', to]);
+  }
   bytes += fs.statSync(to).size;
 }
 const img = (s, alt, cls = '') => `<a class="shot ${cls}" href="${s.l}" data-full><img src="${s.t}" width="${s.w}" height="${s.h}" alt="${esc(alt)}" loading="lazy" decoding="async"></a>`;
@@ -67,7 +75,12 @@ const fig = (s, alt, cap, title = '') => `<figure${title ? ` title="${esc(title)
 const proof = (name, s, body, cls = '') => `<div class="proof ${cls}"><p class="spec">${esc(name)} <span>${s.srcW} × ${s.srcH} px</span></p>${body}</div>`;
 
 async function main() {
-  fs.rmSync(SHOTS, { recursive: true, force: true });
+  const pm = previewList('preview/out'); // fail early, before the expensive sections
+  // keep the re-encoded preview videos so an unchanged source is not encoded again
+  for (const f of fs.existsSync(SHOTS) ? fs.readdirSync(SHOTS) : []) {
+    if (f !== 'preview') fs.rmSync(path.join(SHOTS, f), { recursive: true, force: true });
+    else for (const g of fs.readdirSync(path.join(SHOTS, f))) if (!g.endsWith('.mp4')) fs.rmSync(path.join(SHOTS, f, g), { recursive: true, force: true });
+  }
   fs.mkdirSync(SHOTS, { recursive: true });
   await sharp(path.join(SKILL, '../../.claude-plugin/icon.png')).resize(64).png().toFile(path.join(SHOTS, 'icon.png'));
 
@@ -115,7 +128,6 @@ async function main() {
   }
 
   // app previews: web copies of the en-US videos (the renders are 8-20 MB), poster, and the two creative images
-  const pm = JSON.parse(fs.readFileSync(path.join(EX, 'preview/out/manifest.json'), 'utf8')).previews;
   const pv = (target) => pm.find((p) => p.target === target && p.locale === 'en-US');
   const pdir2 = path.join(EX, 'preview/out');
   const tour = pv('preview-iphone'), head = pv('header-video');
@@ -304,7 +316,8 @@ dialog button{position:fixed;top:14px;right:18px;width:44px;height:44px;border-r
   <div class="devs">
     ${proof(TARGET_NAMES['preview-iphone'], d.previews.tour, `<div class="pv phone"><video controls loop muted playsinline preload="metadata" poster="shots/preview/tour.png" src="shots/preview/tour.mp4" aria-label="App preview, iPhone"></video></div>`, 'third')}
     ${proof(TARGET_NAMES['header-video'], d.previews.head, `<div class="pv"><video controls loop muted playsinline preload="metadata" poster="shots/preview/header.png" src="shots/preview/header.mp4" aria-label="Product page header video"></video></div>`, 'twothirds')}
-    ${proof('Product page header and In-App Event card', d.previews.header, `<div class="grid wide">${fig(d.previews.header, 'Product page header image', TARGET_NAMES['app-header'])}${fig(d.previews.event, 'In-App Event card image', TARGET_NAMES['event-card'])}</div>`)}
+    ${proof(TARGET_NAMES['app-header'], d.previews.header, `<div class="grid wide">${fig(d.previews.header, 'Product page header image', TARGET_NAMES['app-header'])}</div>`, 'twothirds')}
+    ${proof(TARGET_NAMES['event-card'], d.previews.event, `<div class="grid wide">${fig(d.previews.event, 'In-App Event card image', TARGET_NAMES['event-card'])}</div>`, 'third')}
   </div>
 </section>
 
