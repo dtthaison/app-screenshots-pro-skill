@@ -36,12 +36,12 @@ export const TARGETS = {
   'preview-ipad-9.7': { w: 900, h: 1200, store: 'ios', model: 'ipad', max: 3, asc: 'IPAD_97', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPad app preview 9.7"' },
   'preview-mac':      { w: 1920, h: 1080, store: 'ios', family: 'desktop', model: 'macbook', max: 3, asc: 'DESKTOP', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Mac app preview 1920×1080', landscape: true },
 
-  // ---- Apple creative assets: product page header, search results, In-App Events (video 5–30 s / 15–30 s, image <= 500 MB) ----
+  // ---- Apple creative assets: product page header, search results, In-App Events (video 5–30 s / 15–30 s, image <= 500 MB, one per locale) ----
   // Source: https://developer.apple.com/help/app-store-connect/reference/app-information/creative-assets-specifications (values copied 2026-10-30)
-  'header-video':       { w: 3840, h: 1646, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Product page header video 21:9', landscape: true },
-  'search-video':       { w: 3840, h: 2560, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Search results video 3:2', landscape: true },
-  'event-card-video':   { w: 3840, h: 2160, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event card video 16:9', landscape: true },
-  'event-details-video': { w: 2160, h: 3840, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event details video 9:16' },
+  'header-video':       { w: 3840, h: 1646, store: 'ios', family: 'creative', model: 'iphone', max: 1, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Product page header video 21:9', landscape: true },
+  'search-video':       { w: 3840, h: 2560, store: 'ios', family: 'creative', model: 'iphone', max: 1, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Search results video 3:2', landscape: true },
+  'event-card-video':   { w: 3840, h: 2160, store: 'ios', family: 'creative', model: 'iphone', max: 1, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event card video 16:9', landscape: true },
+  'event-details-video': { w: 2160, h: 3840, store: 'ios', family: 'creative', model: 'iphone', max: 1, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event details video 9:16' },
   'app-header':         { w: 3840, h: 1646, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'Product page header 21:9', landscape: true },
   'app-header-16-9':    { w: 5244, h: 2950, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, formats: ['png'], label: 'Product page header 16:9 (PNG only)', landscape: true },
   'search-asset':       { w: 3840, h: 2560, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'Search results asset 3:2', landscape: true },

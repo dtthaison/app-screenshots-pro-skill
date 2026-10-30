@@ -36,6 +36,7 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
     return {
       id: s.id, index, start, end: cursor, duration, transition: { kind, dur: TRANSITIONS[kind] ?? 0 },
       entrance, motion, clip: clipOk ? s.clip : null, overflow: s.overflow ?? 0,
+      continuous: index > 0 && !!s.continuous,                 // same layout and device as the scene before: the device stays put
       labels: (s.labels ?? []).map((l) => ({ at: l.at ?? 0, until: l.until ?? duration, text: l.text })),
       fadeIn: 0, fadeOut: 0,
     };
@@ -71,14 +72,14 @@ export function stateAt(tl, t) {
 
       // entrance is timed from the start of the transition into the scene
       const e = ENTRANCES[s.entrance];
-      const dev = e ? prog(t, a, e.device) : 1, cap = e ? prog(t, a + e.delay, e.caption) : 1;
+      const dev = e && !s.continuous ? prog(t, a, e.device) : 1, cap = e ? prog(t, a + e.delay, e.caption) : 1;
       const rise = e?.rise ?? 0;
 
       const p = prog(t, s.start, s.duration);
       const frame = s.clip ? Math.min(s.clip.frames - 1, Math.max(0, Math.floor((t - s.start) * s.clip.fps))) : null;
       return {
         id: s.id, visible, opacity, tx, veil,
-        device: { opacity: dev, dy: rise * (1 - dev) },
+        device: { opacity: dev, dy: s.continuous ? 0 : rise * (1 - dev) },
         caption: { opacity: cap, dy: rise * (1 - cap) },
         screen: { scale: s.motion === 'drift' ? 1 + (DRIFT - 1) * p : 1, scrollY: s.motion === 'scroll' ? p : 0, frame },
         labels: s.labels.map((l) => ({

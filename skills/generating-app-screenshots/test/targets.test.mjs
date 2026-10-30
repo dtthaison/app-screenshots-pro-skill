@@ -22,19 +22,19 @@ test('apple preview sizes and asc identifiers', () => {
 });
 test('header-video is 3840x1646, 5–30 s, family creative', () => {
   const t = resolveTarget('header-video');
-  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.landscape], [3840, 1646, 5, 30, 'creative', true]);
+  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.landscape, t.max], [3840, 1646, 5, 30, 'creative', true, 1]);
 });
 test('search-video is 3840x2560, 5–30 s', () => {
   const t = resolveTarget('search-video');
-  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family], [3840, 2560, 5, 30, 'creative']);
+  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.max], [3840, 2560, 5, 30, 'creative', 1]);
 });
 test('event-card-video is 3840x2160, 15–30 s', () => {
   const t = resolveTarget('event-card-video');
-  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family], [3840, 2160, 15, 30, 'creative']);
+  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.max], [3840, 2160, 15, 30, 'creative', 1]);
 });
 test('event-details-video is 2160x3840, 15–30 s', () => {
   const t = resolveTarget('event-details-video');
-  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.landscape], [2160, 3840, 15, 30, 'creative', false]);
+  assert.deepEqual([t.w, t.h, t.video.minSec, t.video.maxSec, t.family, t.landscape, t.max], [2160, 3840, 15, 30, 'creative', false, 1]);
 });
 test('preview-ipad@landscape swaps to 1600x1200', () => {
   const t = resolveTarget('preview-ipad@landscape');
