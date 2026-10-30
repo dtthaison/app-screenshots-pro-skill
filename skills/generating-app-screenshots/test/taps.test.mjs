@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { sidecarPath, readSidecar, validateSidecar, markSpan, tapsInSpan, activityInSpan, tapProgress, tapColor, TAP_FX } from '../scripts/taps.mjs';
+import { sidecarPath, resolveTap, readSidecar, validateSidecar, markSpan, tapsInSpan, activityInSpan, tapProgress, tapColor, TAP_FX } from '../scripts/taps.mjs';
 import { buildSidecar } from '../scripts/record.mjs';
 
 const sc = { version: 1, fps: 30, width: 1206, height: 2622, events: [
@@ -71,4 +71,23 @@ test('tapColor: white on a dark screen, the accent on a light one', async () => 
   const mk = async (bg, name) => { const f = path.join(d, name); await sharp({ create: { width: 200, height: 400, channels: 3, background: bg } }).jpeg().toFile(f); return f; };
   assert.equal(await tapColor(await mk('#101010', 'dark.jpg'), 0.5, 0.5, '#ff0066'), '#ffffff');
   assert.equal(await tapColor(await mk('#f0f0f0', 'light.jpg'), 0.99, 0.99, '#ff0066'), '#ff0066');
+});
+
+test('resolveTap: scene, then preview, then theme, then ripple; none turns it off', () => {
+  assert.deepEqual(resolveTap(undefined, undefined, undefined), { explicit: false, style: 'ripple' });
+  assert.deepEqual(resolveTap(undefined, 'ring', 'spotlight'), { explicit: true, style: 'ring' });
+  assert.deepEqual(resolveTap(undefined, undefined, 'spotlight'), { explicit: true, style: 'spotlight' });
+  assert.deepEqual(resolveTap('spotlight', 'ring', undefined), { explicit: true, style: 'spotlight' });
+  assert.deepEqual(resolveTap('none', 'ring', 'spotlight'), { explicit: true, style: null });
+  assert.throws(() => resolveTap('glow'), /unknown tap "glow" \(ripple, ring, spotlight, none\)/);
+});
+test('spotlight cut-out is 18% of the screen width wide (radius 9%)', () => assert.equal(TAP_FX.spotlight.radius, 0.09));
+test('markSpan without from starts at 0; a reversed span from the start never prints undefined', () => {
+  assert.deepEqual(markSpan(sc, undefined, 'log', 20), { start: 0, end: 3.2 });
+  assert.deepEqual(markSpan(sc, undefined, undefined, 20), { start: 0, end: 1.1 });
+  assert.throws(() => markSpan({ marks: { a: 0 } }, undefined, 'a', 20), /mark "a" \(0s\) is not after "start" \(0s\)/);
+});
+test('tapsInSpan: a tap at the span start counts, one at the end does not', () => {
+  const o = { events: [{ t: 2, kind: 'tap', x: 0.5, y: 0.5 }, { t: 5, kind: 'tap', x: 0.5, y: 0.5 }, { t: 4.999, kind: 'tap', x: 0.5, y: 0.5 }] };
+  assert.deepEqual(tapsInSpan(o, 2, 5).map((e) => e.srcT), [2, 4.999]);
 });

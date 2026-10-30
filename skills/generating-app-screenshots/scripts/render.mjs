@@ -18,7 +18,7 @@ import { patternElements, sceneSvg } from './panorama.mjs';
 import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kinetic.mjs';
 import { frameDiffs } from './align.mjs';
 import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from './ramp.mjs';
-import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, TAP_STYLES } from './taps.mjs';
+import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, resolveTap } from './taps.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
@@ -568,11 +568,15 @@ async function resolvePreviews({ ffmpeg }) {
           // clip.from / clip.to name marks in the recording's sidecar; they replace clip.start / clip.end
           const named = scene.clip?.from != null || scene.clip?.to != null;
           if (named && (scene.clip.start != null || scene.clip.end != null)) throw new Error('clip.from/to and clip.start/end cannot be combined — use one or the other');
-          const sidecar = readSidecar(info.file);
-          const tapStyle = scene.tap ?? preview.tap;
-          if (tapStyle != null && !TAP_STYLES.includes(tapStyle)) throw new Error(`unknown tap "${tapStyle}" (${TAP_STYLES.join(', ')})`);
+          let sidecar = null;
+          try { sidecar = readSidecar(info.file); } catch (e) {
+            if (named) throw e;
+            warnSet.add(`${e.message} — taps skipped`);
+          }
+          // scene, then preview, then theme; ripple when none says otherwise. Only an explicit setting notes a missing sidecar.
+          const { explicit, style: tapStyle } = resolveTap(scene.tap, preview.tap, vdef.tap);
           if (named && !sidecar) throw new Error(`clip marks need ${path.relative(BASE, sidecarPath(info.file))} — record with record.mjs`);
-          if (tapStyle && !sidecar) notes.push('taps skipped: no sidecar');
+          if (explicit && tapStyle && !sidecar && !fs.existsSync(sidecarPath(info.file))) notes.push('taps skipped: no sidecar');
           const span = named ? markSpan(sidecar, scene.clip.from, scene.clip.to, info.duration) : { start: scene.clip?.start ?? 0, end: scene.clip?.end };
           const start = span.start;
           if (!auto && !(typeof speed === 'number' && speed > 0)) throw new Error(`clip.speed must be a number above 0 or "auto" (got ${JSON.stringify(speed)})`);
@@ -612,7 +616,7 @@ async function resolvePreviews({ ffmpeg }) {
               const src = Math.min(ex.count - 1, Math.max(0, Math.round((e.srcT - start) * ex.fps)));
               const at = outputFrame(map, src) / ex.fps;
               if (e.align === 'window') notes.push(`tap at ${e.srcT.toFixed(2)}s was timed from the command window (may be early or late)`);
-              tapList.push({ at, x: e.x, y: e.y, kind: e.kind, ...(e.kind === 'swipe' && { x2: e.x2, y2: e.y2, dur: e.dur }), color: await tapColor(ex.files[src], e.x, e.y, accent) });
+              tapList.push({ at, x: e.x, y: e.y, kind: e.kind, ...(e.kind === 'swipe' && { x2: e.x2, y2: e.y2, dur: e.dur }), color: e.kind === 'tap' && tapStyle === 'spotlight' ? undefined : await tapColor(ex.files[src], e.x, e.y, accent) });
             }
             tapStyleUsed = tapStyle;
           }
@@ -762,7 +766,10 @@ async function applyState(state) {
           const s = fx.spotlight, e = p * (s.in + s.hold + s.out);
           el.style.opacity = e < s.in ? e / s.in : e < s.in + s.hold ? 1 : 1 - (e - s.in - s.hold) / s.out;
         } else if (style === 'ring') {
-          el.style.transform = `scale(${(fx.ripple.r0 + (fx.ripple.r1 - fx.ripple.r0) * ease) / fx.ripple.r1})`;
+          // the stroke stays 3 px, so the ring grows by width/height, not by scale
+          const r = (fx.ripple.r0 + (fx.ripple.r1 - fx.ripple.r0) * ease) * w;
+          el.style.width = el.style.height = `${2 * r}px`;
+          el.style.left = `${+d.x * w - r}px`; el.style.top = `${+d.y * fxLayer.clientHeight - r}px`;
           el.style.opacity = 1 - p;
         } else {
           el.style.transform = `scale(${(fx.ripple.r0 + (fx.ripple.r1 - fx.ripple.r0) * ease) / fx.ripple.r1})`;
