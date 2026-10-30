@@ -145,7 +145,64 @@ test('startEncoder writes a valid mp4', { skip: !findFfmpeg() }, async () => {
 });
 test('startEncoder rejects with the log tail on failure', { skip: !findFfmpeg() }, async () => {
   const enc = startEncoder(findFfmpeg(), ['-i', '/nonexistent/x.mp4', '-y', '/nonexistent/o.mp4']);
-  await assert.rejects(enc.end(), /ffmpeg exited/);
+  await assert.rejects(enc.end(), (e) => /ffmpeg exited 1: /.test(e.message) && e.message.includes(enc.log.slice(-10).join('\n')) && enc.log.length > 0);
+});
+test('startEncoder write after ffmpeg exited rejects instead of hanging', { skip: !findFfmpeg() }, async () => {
+  const enc = startEncoder(findFfmpeg(), ['-i', '/nonexistent/x.mp4', '-y', '/nonexistent/o.mp4']); // exits at once
+  const big = Buffer.alloc(1 << 20, 1);
+  const run = (async () => { for (let i = 0; i < 50; i++) await enc.write(big); })();
+  await assert.rejects(Promise.race([run, new Promise((_, r) => setTimeout(() => r(new Error('write hung')), 5000))]), /ffmpeg exited/);
+  await assert.rejects(enc.write(big), /ffmpeg exited/);
+  await enc.kill();
+});
+test('startEncoder exercises back-pressure with large writes, and kill() stops ffmpeg', { skip: !findFfmpeg() }, async () => {
+  const jpg = await sharp({ create: { width: 1500, height: 1500, channels: 3, background: '#123456' } }).jpeg({ quality: 100 }).toBuffer();
+  const enc = startEncoder(findFfmpeg(), encodeArgs({ fps: 30, width: 1500, height: 1500, out: path.join(os.tmpdir(), `asp-bp-${process.pid}.mp4`), total: 1, music: null }));
+  const big = Buffer.concat([jpg, Buffer.alloc(4 << 20)]); // trailing zeros after the JPEG are tolerated
+  let drained = false;
+  for (let i = 0; i < 3; i++) { await enc.write(big); drained = true; }
+  assert.ok(drained);
+  await enc.kill();
+  fs.rmSync(path.join(os.tmpdir(), `asp-bp-${process.pid}.mp4`), { force: true });
+});
+test('findFfmpeg throws when FFMPEG_PATH is set but missing', () => {
+  const old = process.env.FFMPEG_PATH;
+  process.env.FFMPEG_PATH = '/nonexistent/ffmpeg';
+  try { assert.throws(() => findFfmpeg(), /FFMPEG_PATH is set but not found: \/nonexistent\/ffmpeg/); }
+  finally { old === undefined ? delete process.env.FFMPEG_PATH : (process.env.FFMPEG_PATH = old); }
+});
+test('probeClip swaps width/height for a display-rotated clip', { skip: !findFfmpeg() }, () => {
+  const ff = findFfmpeg(), d = tmp();
+  try {
+    const a = path.join(d, 'a.mp4'), b = path.join(d, 'b.mp4');
+    spawnSync(ff, ['-f', 'lavfi', '-i', 'testsrc=size=320x640:rate=30:duration=1', '-pix_fmt', 'yuv420p', '-y', a], { stdio: 'pipe' });
+    const r = spawnSync(ff, ['-display_rotation', '90', '-i', a, '-c', 'copy', '-y', b], { stdio: 'pipe' });
+    assert.equal(r.status, 0);
+    const p = probeClip(ff, b);
+    assert.deepEqual([p.width, p.height], [640, 320]);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+test('extractClip re-extracts a dir without the completion marker', { skip: !findFfmpeg() }, () => {
+  const ff = findFfmpeg(), d = tmp();
+  try {
+    const clip = path.join(d, 'clip.mp4'), dir = path.join(d, 'frames');
+    spawnSync(ff, ['-f', 'lavfi', '-i', 'testsrc=size=320x640:rate=30:duration=1', '-pix_fmt', 'yuv420p', '-y', clip], { stdio: 'pipe' });
+    fs.mkdirSync(dir); for (const n of ['00001', '00002', '00003']) fs.writeFileSync(path.join(dir, `${n}.jpg`), 'stale');
+    fs.mkdirSync(`${dir}.tmp`); fs.writeFileSync(path.join(`${dir}.tmp`, 'junk.jpg'), 'x');
+    const x = extractClip(ff, { file: clip, start: 0, end: 1, speed: 1, height: 320, dir });
+    assert.equal(x.count, 30); assert.ok(fs.statSync(x.files[0]).size > 100); assert.ok(!fs.existsSync(`${dir}.tmp`));
+    assert.throws(() => extractClip(ff, { file: path.join(d, 'missing.mp4'), start: 0, end: 1, speed: 1, height: 320, dir: path.join(d, 'f2') }), /ffmpeg exited/);
+    assert.ok(!fs.existsSync(path.join(d, 'f2')) && !fs.existsSync(path.join(d, 'f2.tmp')));
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+test('filmstrip picks one frame per second: 60 frames at 30 fps over 2 s -> 2 tiles', async () => {
+  const d = tmp();
+  try {
+    const buf = await sharp({ create: { width: 100, height: 200, channels: 3, background: '#00ff00' } }).png().toBuffer();
+    const frames = Array.from({ length: 60 }, (_, i) => ({ t: i / 30, buf }));
+    const r = await filmstrip(frames, path.join(d, 'f.jpg'));
+    assert.deepEqual([r.w, r.h], [8 + 2 * (120 + 8), 8 + 1 * (240 + 28 + 8)]);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
 test('filmstrip tiles one frame per second', async () => {
   const d = tmp();
@@ -155,6 +212,7 @@ test('filmstrip tiles one frame per second', async () => {
     const r = await filmstrip(frames, path.join(d, 'f.jpg'));
     const m = await sharp(r.file).metadata();
     assert.deepEqual([m.width, m.height], [r.w, r.h]);
-    assert.ok(r.w > 10 * 120 && r.h > 3 * 240);
+    const tw = 120; // 100x200 source scaled to 240 high
+    assert.deepEqual([r.w, r.h], [8 + 10 * (tw + 8), 8 + 3 * (240 + 28 + 8)]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

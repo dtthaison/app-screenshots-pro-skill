@@ -140,10 +140,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
-// FFMPEG_PATH, then the ffmpeg-static binary, then ffmpeg on PATH. null when none works.
+// FFMPEG_PATH (must exist, else throws), then the ffmpeg-static binary, then ffmpeg on PATH; null when none is
+// found. Only file existence is checked, not that the binary runs.
 export function findFfmpeg() {
   const env = process.env.FFMPEG_PATH;
-  if (env && fs.existsSync(env)) return env;
+  if (env) {
+    if (!fs.existsSync(env)) throw new Error(`FFMPEG_PATH is set but not found: ${env}`);
+    return env;
+  }
   try {
     const p = createRequire(import.meta.url)('ffmpeg-static');
     if (p && fs.existsSync(p)) return p;
@@ -160,7 +164,11 @@ export function probeClip(ffmpeg, file) {
   const sz = v.replace(/\b0x[0-9a-f]+/gi, '').match(/(\d{2,5})x(\d{2,5})/);
   const fps = v.match(/(\d+(?:\.\d+)?)\s*fps/);
   if (!d || !sz) throw new Error(`cannot read video info from ${file}: ${err.trim().split('\n').slice(-3).join(' | ')}`);
-  return { duration: +d[1] * 3600 + +d[2] * 60 + +d[3], width: +sz[1], height: +sz[2], fps: fps ? +fps[1] : null };
+  // phone recordings carry a display rotation; extractClip autorotates, so report the displayed size
+  const rot = err.match(/displaymatrix: rotation of (-?[\d.]+) degrees/) || err.match(/\brotate\s*:\s*(-?\d+)/);
+  const swap = rot && Math.round(Math.abs(+rot[1]) / 90) % 2 === 1;
+  const [w, h] = swap ? [+sz[2], +sz[1]] : [+sz[1], +sz[2]];
+  return { duration: +d[1] * 3600 + +d[2] * 60 + +d[3], width: w, height: h, fps: fps ? +fps[1] : null };
 }
 
 export function clipKey({ file, start, end, speed, height }) {
@@ -169,17 +177,25 @@ export function clipKey({ file, start, end, speed, height }) {
 }
 
 // Cut [start,end] of a screen recording into 30 fps JPEGs (re-encoded, so -ss before -i is frame-accurate).
+// Extracts into `dir.tmp` and renames on success; a `.done` marker is the only cache hit, so partial runs re-extract.
 export function extractClip(ffmpeg, { file, start = 0, end, speed = 1, height, dir }) {
   const list = () => fs.readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().map((f) => path.join(dir, f));
-  let files = fs.existsSync(dir) ? list() : [];
-  if (!files.length) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(path.join(dir, '.done'))) {
+    const tmp = `${dir}.tmp`;
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(tmp, { recursive: true });
     const vf = [`setpts=PTS/${speed}`, `fps=${FPS}`, height ? `scale=-2:${height}` : null].filter(Boolean).join(',');
-    const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), ...(end != null ? ['-to', String(end)] : []), '-i', file, '-vf', vf, '-q:v', '2', '-y', path.join(dir, '%05d.jpg')];
+    const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), ...(end != null ? ['-to', String(end)] : []), '-i', file, '-vf', vf, '-q:v', '2', '-y', path.join(tmp, '%05d.jpg')];
     const r = spawnSync(ffmpeg, args, { stdio: 'pipe', encoding: 'utf8' });
-    if (r.status !== 0) throw new Error(`ffmpeg exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-10).join('\n')}`);
-    files = list();
+    if (r.status !== 0) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      throw new Error(`ffmpeg exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-10).join('\n')}`);
+    }
+    fs.writeFileSync(path.join(tmp, '.done'), '');
+    fs.renameSync(tmp, dir);
   }
+  const files = list();
   return { dir, files, count: files.length, fps: FPS };
 }
 
@@ -201,28 +217,36 @@ export function encodeArgs({ fps, width, height, out, total, music, scaleTo }) {
   return a;
 }
 
-// Spawn the encoder; write() honours back-pressure, end() resolves on exit 0 else rejects with the log tail.
+// Spawn the encoder; write() honours back-pressure and rejects once ffmpeg has exited; end() resolves on exit 0
+// else rejects with the log tail; kill() stops it (for a caller that throws mid-capture).
 export function startEncoder(ffmpeg, args) {
   const p = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', ...args], { stdio: ['pipe', 'ignore', 'pipe'] });
   const log = [];
-  let rest = '';
+  let rest = '', exited = false, failure = null;
   p.stderr.on('data', (d) => {
     const lines = (rest + d).split(/\r?\n|\r/); rest = lines.pop();
     log.push(...lines.filter(Boolean)); if (log.length > 50) log.splice(0, log.length - 50);
   });
   const done = new Promise((res, rej) => {
-    p.on('error', rej);
-    p.on('close', (code) => {
-      if (rest) log.push(rest);
-      code === 0 ? res() : rej(new Error(`ffmpeg exited ${code}: ${log.slice(-10).join('\n')}`));
-    });
+    const finish = (err) => { exited = true; if (rest) { log.push(rest); rest = ''; } failure = err; err ? rej(err) : res(); };
+    p.on('error', finish);
+    p.on('close', (code, sig) => finish(code === 0 ? null : new Error(`ffmpeg exited ${code ?? sig}: ${log.slice(-10).join('\n')}`)));
   });
-  done.catch(() => {}); // surfaced by end(); avoid an unhandled rejection if the caller is still writing
-  p.stdin.on('error', () => {});  // EPIPE when ffmpeg died; the exit code reports it
+  done.catch(() => {}); // surfaced by write()/end()
+  p.stdin.on('error', () => {});  // EPIPE when ffmpeg died; the exit status reports it
   return {
     log,
-    write: (buf) => new Promise((res) => { p.stdin.write(buf) ? res() : p.stdin.once('drain', res); }),
+    write: (buf) => new Promise((res, rej) => {
+      if (exited) return rej(failure || new Error('ffmpeg already exited'));
+      if (p.stdin.write(buf)) return res();
+      const off = () => { p.stdin.off('drain', onDrain); p.stdin.off('close', onClose); };
+      const onDrain = () => { off(); res(); };
+      const onClose = () => { off(); done.then(() => rej(new Error('ffmpeg exited before all frames were written')), rej); };
+      p.stdin.once('drain', onDrain); p.stdin.once('close', onClose);
+      done.then(onClose, onClose);
+    }),
     end: () => { p.stdin.end(); return done; },
+    kill: () => { if (!exited) p.kill('SIGKILL'); return done.catch(() => {}); },
   };
 }
 
