@@ -1,0 +1,38 @@
+{
+  "en-US": {
+    "header.title": "Build habits that **actually stick**",
+    "header.subtitle": "Tiny daily wins, one streak at a time.",
+    "event.eyebrow": "Summer challenge",
+    "event.title": "Keep a **30-day streak**",
+    "event.subtitle": "Join the challenge and earn the Gold badge.",
+    "hero.eyebrow": "Habit tracker",
+    "hero.title": "Build habits that **actually stick**",
+    "hero.subtitle": "Tiny daily wins, one streak at a time.",
+    "stats.title": "See your **progress** grow",
+    "stats.subtitle": "Streaks, rates and weekly trends at a glance.",
+    "stats.label1": "Weekly trends",
+    "stats.label2": "Habit by habit",
+    "remind.title": "Gentle **reminders**, right on time",
+    "remind.subtitle": "Never break the streak.",
+    "close.title": "Start your **streak** today",
+    "close.subtitle": "Free on the App Store."
+  },
+  "ja": {
+    "header.title": "続く習慣を、**無理なく**",
+    "header.subtitle": "毎日の小さな達成を、ひとつずつ積み重ねよう。",
+    "event.eyebrow": "サマーチャレンジ",
+    "event.title": "**30日連続**を目指そう",
+    "event.subtitle": "チャレンジに参加してゴールドバッジを手に入れよう。",
+    "hero.eyebrow": "習慣トラッカー",
+    "hero.title": "続く習慣を、**無理なく**",
+    "hero.subtitle": "毎日の小さな達成を、ひとつずつ積み重ねよう。",
+    "stats.title": "**成長**がひと目でわかる",
+    "stats.subtitle": "連続記録、達成率、週ごとの推移をまとめて確認。",
+    "stats.label1": "週ごとの推移",
+    "stats.label2": "習慣ごとの記録",
+    "remind.title": "ちょうどいい**リマインダー**",
+    "remind.subtitle": "連続記録を途切れさせません。",
+    "close.title": "今日から**連続記録**を始めよう",
+    "close.subtitle": "App Storeで無料ダウンロード。"
+  }
+}

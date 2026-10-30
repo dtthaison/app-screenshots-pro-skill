@@ -1,0 +1,121 @@
+{
+  "app": {
+    "name": "Streakly"
+  },
+  "defaultLocale": "en-US",
+  "locales": [
+    "en-US",
+    "ja"
+  ],
+  "targets": [
+    "preview-iphone",
+    "preview-ipad",
+    "header-video",
+    "app-header",
+    "event-card"
+  ],
+  "output": "out",
+  "strings": "copy.json",
+  "theme": {
+    "preset": "aurora",
+    "font": {
+      "family": "Plus Jakarta Sans"
+    }
+  },
+  "slides": [
+    {
+      "id": "header",
+      "layout": "text-left",
+      "title": "@header.title",
+      "subtitle": "@header.subtitle",
+      "screen": "../demo/screens/home.html",
+      "targets": [
+        "app-header"
+      ]
+    },
+    {
+      "id": "event",
+      "layout": "hero",
+      "eyebrow": "@event.eyebrow",
+      "title": "@event.title",
+      "subtitle": "@event.subtitle",
+      "screen": "../demo/screens/home.html",
+      "targets": [
+        "event-card"
+      ]
+    }
+  ],
+  "previews": [
+    {
+      "id": "tour",
+      "clipLocale": "en-US",
+      "byTarget": {
+        "header-video": {
+          "scenes": [
+            "stats",
+            "remind"
+          ],
+          "transition": "push"
+        }
+      },
+      "scenes": [
+        {
+          "id": "hero",
+          "layout": "hero",
+          "eyebrow": "@hero.eyebrow",
+          "title": "@hero.title",
+          "subtitle": "@hero.subtitle",
+          "screen": "../demo/screens/home.html",
+          "duration": 5
+        },
+        {
+          "id": "stats",
+          "layout": "text-top",
+          "title": "@stats.title",
+          "subtitle": "@stats.subtitle",
+          "screen": "recordings/{locale}/walk.mp4",
+          "duration": 6,
+          "labels": [
+            {
+              "at": 1,
+              "until": 3.5,
+              "text": "@stats.label1"
+            },
+            {
+              "at": 3.5,
+              "text": "@stats.label2"
+            }
+          ],
+          "byTarget": {
+            "header-video": {
+              "caption": {
+                "y": 14,
+                "h": 44
+              }
+            }
+          },
+          "caption": {
+            "h": 13
+          }
+        },
+        {
+          "id": "remind",
+          "layout": "tilt-right",
+          "title": "@remind.title",
+          "subtitle": "@remind.subtitle",
+          "screen": "../demo/screens/remind.html",
+          "motion": "scroll",
+          "duration": 5
+        },
+        {
+          "id": "close",
+          "layout": "caption-only",
+          "title": "@close.title",
+          "subtitle": "@close.subtitle",
+          "duration": 4
+        }
+      ],
+      "poster": "stats"
+    }
+  ]
+}
