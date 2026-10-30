@@ -26,7 +26,7 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
 
    **Preview video from real footage** (App Store app previews; iPhone only in this release):
    1. **Brief.** From the code write `preview-brief.json` next to the config: category, signals, moments (things that move, with how to reach each), and the owner's wishes (must-show, must-avoid, channels, tone, `disclose`). Ask the owner anything the code can't say. Fields: [config.md → Real footage previews](references/config.md#real-footage-previews); vocabulary: [concepts.md](references/video/concepts.md).
-   2. **Recommend:** `node <skill-dir>/scripts/recommend.mjs preview-brief.json` gives 3 picks (safe, strongest, bold).
+   2. **Recommend:** `node <skill-dir>/scripts/recommend.mjs preview-brief.json` prints 3 picks (safe, strongest, bold) as text; add `--json` for the machine-readable result (`--json > picks.json` to save it).
    3. **Tell the owner the 3 storylines in words**, no JSON, and let them choose. Don't reorder the ranking; you may note a disagreement.
    4. **Storyboard.** The pick becomes a `previews[]` entry with `concept`, `record` and scenes (`full-screen` / `caption-band` / `end-card`, `moment`, `draft` stills). Run `node <skill-dir>/scripts/render.mjs <config> --check`; fix every ERROR and WARN. Start from `examples/preview-recorded/`.
    5. **Record:** `node <skill-dir>/scripts/record.mjs <config> --preview <id> [--takes 3]` (needs Maestro 2.6+ and a booted simulator; setup and fallback: [reading-the-app.md §2b](references/reading-the-app.md)).
