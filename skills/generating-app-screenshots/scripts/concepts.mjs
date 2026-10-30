@@ -35,7 +35,7 @@ export const CONCEPTS = [
     requires: ['speed', 'onboarding'],
     useWhen: { speed: 3, onboarding: 2, 'replaces-chore': 1 },
     avoidWhen: [], categories: ['utilities', 'travel', 'shopping', 'finance'], bold: true, phase: 1,
-    beats: b(['hook', 2], ['beat', 9], ['beat', 2], ['end', 2]) },
+    beats: b(['hook', 2], ['beat', 5], ['beat', 4], ['beat', 2], ['end', 2]) },
   { id: 'results-first', name: 'Results first', hook: 'outcome', // concepts.md#results-first
     requires: ['progress', 'charts', 'streak', 'counter'],
     useWhen: { progress: 3, charts: 2, streak: 2, counter: 1 },

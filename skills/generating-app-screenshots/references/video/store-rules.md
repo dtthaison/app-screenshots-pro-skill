@@ -51,7 +51,7 @@ and "Highly recommended". Rows say which.
 | Rule id | Rule | Store | Source | verified_on | Status | Enforcing check |
 |---|---|---|---|---|---|---|
 | play-youtube | Mandatory: one YouTube video URL (no playlist, no parameters such as timecodes), public or unlisted, embeddable, not age-restricted, monetization off | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | agent QA |
-| play-first-10s | Highly recommended: show the real app experience in the first 10 s | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | hook-timing |
+| play-first-10s | Highly recommended: show the real app experience in the first 10 s | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | agent QA |
 | play-80-percent | Highly recommended: at least 80% of the video is real user experience; limit title screens, logos and promotional content | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | agent QA |
 | play-autoplay-30s | Only the first 30 s autoplay, muted; keep the video short. No fixed length | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | existing: duration |
 | play-no-hands | Highly recommended: no fingers or people tapping the device, unless the core use is off-device | Play | https://support.google.com/googleplay/android-developer/answer/9866151 | 2026-10-31 | verified | agent QA |

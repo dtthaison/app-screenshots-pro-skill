@@ -118,7 +118,7 @@ A signal is a fact about the app, read from its code. Use only these names (an u
 ## speedrun {#speedrun}
 
 - **Story:** the whole task done fast, with a clock-like claim.
-- **Beats:** hook 2 s, beat 9 s, beat 2 s, end 2 s. Hook: `bold-claim`. Bold concept.
+- **Beats:** hook 2 s, beat 5 s, beat 4 s, beat 2 s, end 2 s. Hook: `bold-claim`. Bold concept.
 - **Use when:** `speed` (3), `onboarding` (2), `replaces-chore` (1). Requires `speed` or `onboarding`. Suits utilities,
   travel, shopping, finance.
 - **Avoid when:** nothing.
