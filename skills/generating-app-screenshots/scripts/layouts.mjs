@@ -48,12 +48,28 @@ export const LAYOUT_INFO = {
   'phone-watch':   'Phone + watch in front (screen = phone, screen2 = watch). "Also on your wrist". watchModel: apple-watch | wear-os.',
   'watch-hero':    'One big watch with straps under the caption (screen = watch UI). Marketing / social / website.',
   'laptop-phone':  'Laptop (screen2) with a phone in front (screen). Cross-platform apps; works on tall and wide canvases.',
+  // ---- real-footage layouts (also fine on screenshots) ----
+  'full-screen':   'The screen fills the canvas edge to edge; the caption sits on a gradient scrim (caption.position: "bottom" flips it). Recordings must match the canvas aspect.',
+  'caption-band':  'A solid band (top 18%, or bottom) holds the caption; the screen fills the rest at its own aspect, so captions never cover the UI.',
+  'end-card':      'App icon (app.icon), app name, the title as a tagline and a small subtitle (e.g. "Subscription required"). No device. Last scene of a preview.',
   'blank':         'Nothing; place elements yourself.',
 };
 export const LAYOUTS = Object.keys(LAYOUT_INFO);
 // wide canvases that hold a laptop / monitor / window (Mac, Windows) may use these too
 const DESK_WIDE = ['text-top', 'hero', 'device-hero', 'tilt-left', 'tilt-right', 'text-left', 'text-right', 'laptop-phone', 'phone-watch'];
-const WIDE_OK = ['phone-watch', 'laptop-phone', 'caption-top', 'text-left', 'text-right', 'caption-only', 'blank', 'frameless', 'feature-grid', 'steps', 'stats', 'review', 'awards', 'landscape', 'mosaic'];
+const WIDE_OK = ['phone-watch', 'laptop-phone', 'caption-top', 'text-left', 'text-right', 'caption-only', 'blank', 'frameless', 'feature-grid', 'steps', 'stats', 'review', 'awards', 'landscape', 'mosaic', 'full-screen', 'caption-band', 'end-card'];
+
+// Aspect rules for a recording (or still) of clipW×clipH on a W×H canvas. Returns an ERROR/WARN message or null.
+export function screenAspectError(layout, clipW, clipH, W, H) {
+  if (layout === 'full-screen') {
+    const off = Math.abs((clipH / clipW) / (H / W) - 1);
+    if (off > 0.02) return `screen ${clipW}×${clipH} does not fit full-screen on ${W}×${H} (aspect off by ${Math.round(off * 100)}%) — use caption-band or record on the matching device`;
+  } else if (layout === 'caption-band') {
+    const share = Math.min(W, (0.82 * H * clipW) / clipH) / W;
+    if (share < 0.8) return `caption-band: the screen is only ${Math.round(share * 100)}% of the canvas width`;
+  }
+  return null;
+}
 
 export function canvasClass(W, H) {
   const r = H / W;
@@ -518,6 +534,39 @@ export function buildLayout(slide, ctx) {
       const base = withFit(device({ x: 44, z: 3, rotate: 7 }), t.dTop + 9, t.dBot + 10, t.dMax - 10);
       const back = (key, scr, k, dx, dy, dim) => ({ ...device({ x: 44 + dx, z: 3 - k, rotate: 7, screen: scr || slide.screen }, key), w: base.w * (1 - 0.06 * k), y: base.y - dy, dim, shadowOpacity: 0.22 });
       return [caption(), back('device3', slide.screen3, 2, tall ? 26 : 22, tall ? 8 : 9, 0.38), back('device2', slide.screen2, 1, tall ? 13 : 11, tall ? 4 : 4.5, 0.18), base];
+    }
+
+    // ---------------- real-footage layouts ----------------
+    case 'full-screen': {
+      const bottom = slide.caption?.position === 'bottom';
+      const bg = theme.background;
+      const solid = typeof bg === 'string' ? bg : bg?.color || bg?.gradient?.stops?.[0]?.split(' ')[0] || '#000';
+      const edge = `color-mix(in srgb, ${solid} 70%, transparent)`;
+      const scrim = { type: 'shape', id: 'scrim', x: 50, y: bottom ? 78 : 0, w: 100, h: 22, z: 3,
+        fill: { angle: bottom ? 0 : 180, stops: [edge, 'transparent'] } };
+      // the status bar stays visible: a top caption starts at 6%, a bottom one ends at 96%
+      const cap = caption(bottom ? { y: 80, h: 16, valign: 'bottom', z: 5 } : { y: 6, h: 15, z: 5 });
+      return [device({ model: 'none', style: 'frameless', radius: 0, shadow: false, x: 50, y: 0, w: 100, screenAspect: H / W, fit: 'cover' }), scrim, cap];
+    }
+
+    case 'caption-band': {
+      const bottom = slide.caption?.position === 'bottom';
+      const bandY = bottom ? 82 : 0, top = bottom ? 0 : 18;
+      const band = { type: 'shape', id: 'band', x: 50, y: bandY, w: 100, h: 18, z: 3, fill: theme.background || '#000' };
+      const d = withFit(device({ model: 'none', style: 'frameless', radius: 0, shadow: false, x: 50 }), top, top + 82, 100);
+      d.y = top + Math.max(0, (82 - heightPct(d, W, H)) / 2);
+      return [band, caption({ y: bandY, h: 18, valign: 'center', z: 5 }), d];
+    }
+
+    case 'end-card': {
+      const icon = slide.appIcon;
+      const color = theme.caption?.color;
+      const els = [];
+      if (icon) els.push({ type: 'image', id: 'appIcon', src: icon, x: 50, y: 30, w: 22, h: (22 * W) / H, radius: 5 });
+      els.push({ type: 'text', id: 'appName', text: slide.appName, x: 50, y: icon ? 46 : 36, w: 88, size: 7, weight: 800, ...(color ? { color } : {}) });
+      els.push(caption({ y: icon ? 55 : 45, h: 12, eyebrow: undefined, subtitle: undefined, titleSize: 4.4 }));
+      if (slide.subtitle) els.push({ type: 'text', id: 'subtitle', text: slide.subtitle, x: 50, y: icon ? 72 : 62, w: 80, size: 3, opacity: 0.8, ...(color ? { color } : {}) });
+      return els;
     }
 
     case 'caption-only':
