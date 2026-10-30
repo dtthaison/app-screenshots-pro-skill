@@ -24,7 +24,9 @@ Paths are relative to the config file. Coordinates for every element:
   "strings": "copy.json",                   // or inline object, or ["copy.json", "Marketing.xcstrings"]
   "theme": { ... },
   "panorama": { ... },                      // optional, see below
-  "slides": [ ... ]                         // order = upload order
+  "slides": [ ... ],                        // order = upload order
+  "previews": [ ... ],                      // optional app preview / creative videos, see "previews"
+  "videoSupersample": 1                     // render scale for videos (default 1; --supersample overrides)
 }
 ```
 
@@ -45,6 +47,33 @@ Paths are relative to the config file. Coordinates for every element:
 | `android-tablet-7` / `android-tablet-10` / `chromebook` | | Play large screens, min 4 |
 | `play-feature-graphic` | 1024×500 | exactly one image |
 | `og-image`, `x-post`, `product-hunt`, `instagram`, `story` | | social promo, not uploaded |
+| `story-video` | 1080×1920 | social video, no store limits; any duration |
+
+**App preview targets** (video, `.mp4`; 15–30 s, up to 3 per target × locale; `asc` = the identifier fastlane `deliver` reads from the file name):
+
+| id | px | `asc` | for |
+|---|---|---|---|
+| `preview-iphone` | 886×1920 | `IPHONE_67` | iPhone 6.9/6.5/6.3/6.1/5.8", Duo (App Store Connect scales it to the smaller slots) |
+| `preview-iphone-16-9` | 1080×1920 | `IPHONE_55` | iPhone 5.5" / 4" (Home button) |
+| `preview-iphone-4.7` | 750×1334 | `IPHONE_47` | iPhone 4.7" |
+| `preview-ipad` | 1200×1600 | `IPAD_PRO_3GEN_129` | iPad 13" / 12.9" / 11" / 10.5" |
+| `preview-ipad-9.7` | 900×1200 | `IPAD_97` | iPad 9.7" |
+| `preview-mac` | 1920×1080 | `DESKTOP` | Mac, landscape; family `desktop` |
+
+`@landscape` works on the iPhone and iPad preview targets.
+
+**Creative targets** (family `creative`: the product page header, search results and In-App Event media; **1 per locale**, 500 MB, no alpha; they use the wide layouts, so give them their own slides with `"targets": ["creative"]` or `["app-header"]`, and `skipTargets` on the phone slides):
+
+| image id | px | video id | video |
+|---|---|---|---|
+| `app-header` | 3840×1646 (21:9), png or jpeg | `header-video` | same size, 5–30 s |
+| `app-header-16-9` | 5244×2950, **png only** | | |
+| `search-asset` | 3840×2560 (3:2), png or jpeg | `search-video` | same size, 5–30 s; muted by Apple, cannot be unmuted |
+| `search-asset-16-9` | 5244×2950, **png only** | | |
+| `event-card` | 3840×2160 (16:9) | `event-card-video` | same size, 15–30 s |
+| `event-details` | 2160×3840 (9:16) | `event-details-video` | same size, 15–30 s |
+
+Apple publishes safe areas only inside its design templates, so the renderer warns when a caption or badge leaves the central 80% of the canvas on a creative target (`caption leaves the safe area`): Apple crops these assets per device. A png-only target with `--format jpeg` is an ERROR (`use --format png`).
 
 Append `@landscape` (e.g. `"ipad-13@landscape"`), or `@styled` to an Apple Watch target (below). Custom: `{ "id": "promo", "w": 1200, "h": 628, "model": "iphone" }`.
 
@@ -56,7 +85,7 @@ background or panorama. Give watch slides their own screens and limit them with 
 caption like a phone slide; App Store Connect accepts these and rounds the corners itself, so keep the caption short and centered.
 Watch slides default to `watch-hero` there, with a strap-less watch filling the canvas under a one-line `title`. `--fastlane`
 exports them as watch screenshots. Wear OS has no `@styled`: Google Play rejects captioned watch shots.
-Apple changes its table yearly — check the App Store Connect "Screenshot specifications" page when unsure.
+Apple changes its table yearly — check the App Store Connect "Screenshot specifications", "App preview specifications" and "Creative assets specifications" pages when unsure.
 
 ## theme
 
@@ -312,13 +341,95 @@ All 15, rendered: `examples/panorama-patterns/index.html` (configs: `examples/pa
 - `_preview/<target>__<locale>__strip.jpg` is the joined design. `__store.jpg` is the **store view**: the same slides as
   rounded cards with gaps, which is what shoppers actually see. Judge spanning devices in the store view, not the strip.
 
+## previews
+
+App previews (the video that plays **first** on the App Store product page) and the creative videos share one top-level `previews` list. A preview is a list of **scenes**; the renderer lays the scenes out like slides, animates them, captures 30 fps frames in Chrome and encodes them with ffmpeg. `previews` and `slides` are independent: a preview does not reuse slides, but a scene is written exactly like a slide, so copy a slide into a scene to start. A single object instead of an array is accepted. Teaching examples: `examples/preview/preview.config.json` (stills, a clip, `byTarget`, every video and creative target) and `examples/preview/clip.config.json` (a scrolling recording, no frame).
+
+```jsonc
+"previews": [
+  {
+    "id": "tour",                                   // file name: 01_tour.mp4
+    "targets": ["preview-iphone", "preview-ipad"],  // optional; default = every video target in cfg.targets (skipTargets works too)
+    "theme": { ... },                               // optional overrides of cfg.theme for this video (and "preset")
+    "music": { "src": "assets/loop.mp3", "volume": 0.8, "fadeOut": 1.5 },   // optional (a string is just the src); silent stereo AAC otherwise
+    "poster": "stats",                              // seconds (default 5) or a scene id: the first rest frame of that scene
+    "transition": "crossfade",                      // default between scenes: crossfade | push | cut | fade-through
+    "loop": "soft",                                 // soft (default) | hard
+    "clipLocale": "en-US",                          // which locale's recording the other locales use
+    "renderScale": 1,                               // drafts: 0.5 renders at half size and upscales
+    "byTarget": { "header-video": { "scenes": ["stats", "remind"], "transition": "push" } },   // also byLocale
+    "scenes": [ ... ]
+  }
+]
+```
+
+Defaults for every preview come from `theme.video`: `{ "entrance": "rise", "transition": "crossfade", "scroll": { "speed": 1 } }` (`scroll.speed` is accepted but not used yet: a scroll always spans the scene). Merge order: `theme.video` < preview < scene.
+
+**Always an audio track.** Every file has a stereo AAC track, silent unless `music` is set, because App Store Connect rejects a video with no audio track and simulator recordings have none. Header videos are muted on the store and search videos cannot be unmuted, so nothing in a creative video may depend on sound (`music` on `search-video` warns). Music is cut to the video length and faded out with `fadeOut` seconds.
+
+**Encoding.** H.264 High, 30 fps, yuv420p, `.mp4` with faststart; Level 4.0 at 11 Mbps for the app preview sizes, a higher level and 20 Mbps for the 4K creative videos (picked automatically from the frame size).
+
+**ffmpeg** is looked up as `FFMPEG_PATH`, then the bundled `ffmpeg-static`, then `ffmpeg` on `PATH`. `ffmpeg-static` is an optional dependency: `npm install` downloads its ffmpeg binary (GPL-3.0) at install time; this repo is MIT and does not redistribute it. With no binary the renderer prints `ERROR previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg`. A `FFMPEG_PATH` that does not exist is its own ERROR.
+
+### Scenes
+
+A scene is a slide plus time. Every slide field works (`layout`, `eyebrow/title/subtitle`, `screen`, `screen2`, `background`, `device`, `preset`, `elements`, `targets`, `skipTargets`, `byTarget`, `byLocale`, `highlight`, `caption`).
+
+```jsonc
+{
+  "id": "session",                                        // required, unique in the preview
+  "layout": "text-top",
+  "title": "@session.title",
+  "duration": 7,                                          // seconds; default 4
+  "screen": "recordings/{locale}/session.mov",            // .png/.jpg still, .html mock, or .mov/.mp4/.m4v/.webm clip
+  "clip": { "start": 12, "end": 19, "speed": 1 },         // clips only: the part to show (default whole file, 1x)
+  "motion": "scroll",                                     // stills only: drift (default) | scroll | none
+  "labels": [                                             // sub-captions that appear during the scene
+    { "at": 1.5, "until": 4, "text": "@session.swapping" },
+    { "at": 4.5, "text": "@session.superset" }            // until = scene end
+  ],
+  "in": "rise",                                           // how the device and caption enter: rise (default) | fade | none
+  "transition": "push"                                    // overrides the preview default for the cut INTO this scene
+}
+```
+
+- **Timing.** Durations include the transition into the next scene (a 0.5 s crossfade overlaps the end of scene n and the start of n+1), so the total is the sum of the durations. Transition lengths are fixed: crossfade 0.5 s, push 0.6 s (new scene slides in from the right), fade-through 0.6 s (to the background color and back), cut 0. A scene must be longer than its transitions.
+- **Duration limits.** App previews 15–30 s; header and search videos 5–30 s; In-App Event videos 15–30 s. Outside the range the renderer errors (it does not cut) and prints the sum: `preview is 9s; preview-iphone wants 15–30s`. Pick the scenes for a shorter target with `byTarget.<target>.scenes`. Count per target × locale: up to 3 previews for the Apple preview targets, 1 for creative targets and images.
+- **Stills.** `drift` is a slow 3% zoom (the default); `none` is static; `scroll` pans the screen from top to bottom inside the device and needs content taller than the screen. A mock with `motion: "scroll"` is rendered full-page. When the still does not overflow the device screen by more than 2%, `scroll` falls back to `drift`.
+- **Clips.** A recording is cut into frames once (30 fps, cached under `out/.build/clips/`) and played on the scene's **main device** only (id `device`; a clip on another element is an ERROR). `{locale}` resolves like a screen. A clip shorter than the scene holds its last frame (WARN `clip … is 2.0s but scene "x" lasts 4s — the last frame holds`). A clip longer than the scene is cut at `clip.end` or the scene end. A clip whose aspect is more than 2% off the device screen is cropped to fill (WARN `clip 400×960 does not match the iphone screen`): record on the same device class as the frame.
+- **Continuity.** When two consecutive scenes share the layout and the main device's position, the device stays put (no re-entrance) and only the caption, labels and screen change. One long recording cut with `clip.start`/`end` into several scenes with their own captions becomes chapters.
+- **Labels.** A badge under the caption (above it for bottom captions), aligned with the caption's x, in the theme accent; `at`/`until` are seconds from the scene start, fading in and out over 0.3 s. Only object labels are timed; the `before-after` layout keeps its own string `labels`.
+- **Entrance and loop.** `in: "rise"`: the device rises 6% while fading in over 0.6 s, the caption follows 0.1 s later over 0.5 s; `fade` is the same without the rise; `none` shows both at once. Scene 1 fades in from the background color over 0.4 s and the last scene fades out to it over 0.6 s, so the loop point has no jump (the store autoplays previews on a loop). `"loop": "hard"` on the preview turns both fades off, for authors who cut on purpose.
+- **Recording per locale.** `clipLocale: "en-US"` declares that the other locales use the en-US recording and silences the warning `[ja] no recording for this locale — using en-US; UI language in the recording does not match`. Without it the warning stays, because Apple wants the UI in the store language.
+- **`byTarget.scenes`.** A list of scene ids picks and orders the preview's own scenes for that target (an unknown id is an ERROR); a list of scene objects replaces them. Use it so the 21:9 header carries only the one flow that sells the app.
+
+### Creative videos
+
+The header, search and In-App Event videos are the same `previews[]` entry with the creative targets added; they should show how the app works, so use recordings (`clip`). The 21:9 header is wide and short: switch the layout with `byTarget` (`text-left` / `text-right`, the phone at one side), keep text inside the safe area, and pick fewer scenes. When every scene of a creative video is a still, the renderer notes that the file is a draft (`header-video/en-US/chap.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`); the same holds, as `NOTE … every scene is a still — fine for a draft`, for app preview targets. The 4K targets render at about 2–4 frames/s: render them for the default locale first, and use `motion: "none"` scenes, which reuse the previous frame.
+
+The example's three tweaks are specific to its content; do not copy them blindly:
+
+- `"poster": "stats"` takes the poster from that scene's rest frame instead of the 5 s default, which would land in a transition between short scenes.
+- `byTarget.header-video.caption` on the stats scene moves the caption (`y: 14, h: 44`) so labels stay inside the 21:9 header's safe area.
+- `"caption": { "h": 13 }` on the stats scene makes the caption box shorter, so the label badge sits above the phone instead of on its top edge.
+
+### Poster frame
+
+App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:10"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
+
 ## CLI
 
 `node scripts/render.mjs <config> [--out dir] [--locales a,b] [--targets a,b] [--slides a,b] [--format png|jpeg|webp] [--supersample 2] [--fastlane] [--no-preview]`
+`  [--previews a,b] [--scenes a,b] [--no-previews] [--only-previews]`
 Rendering happens at `supersample`× (default 2; config `"supersample"`) and is downsampled with Lanczos for crisp edges. Use 1 for quick drafts.
+`--supersample` applies to both passes; the video default is 1 (`videoSupersample` in the config sets it). `renderScale` on a video target (or in a preview's `byTarget`) renders at that fraction and upscales: drafts only (`NOTE … rendered at 0.5× — drafts only`).
+`--targets` and `--locales` filter both passes. `--slides` filters screenshots only. `--previews tour` renders only those previews. `--scenes a,b` renders only those scenes of a preview (for iterating; the duration check is skipped and a NOTE says so). `--no-previews` skips the video pass and `--only-previews` skips the screenshot pass (`--no-preview`, singular, is the QA sheets). A video target in `targets` with no `previews` in the config is an ERROR.
 Screens may carry a query (`screens/stats.html?state=before`) that the HTML mock reads, so one mock can show several states.
-Exit code 0 = clean; 1 = validation errors (wrong size, alpha, too many files, overflowing text, missing screen/string); 2 = crash.
+Exit code 0 = clean; 1 = validation errors (wrong size, alpha, too many files, overflowing text, missing screen/string, duration out of range); 2 = crash.
 Outputs: `out/<target>/<locale>/NN_<id>.png`, `out/_preview/*.jpg` contact sheets (rows of 6, for QA),
 `out/index.html` (full-resolution gallery with slide + layout labels), `out/manifest.json`,
 and with `--fastlane`: `out/fastlane/screenshots/<asc-locale>/` + `out/fastlane/metadata/android/<play-locale>/images/...`.
+Previews add `out/<target>/<locale>/NN_<id>.mp4` and `NN_<id>.poster.png`; a filmstrip `out/_preview/<target>__<locale>__<id>.jpg` (one frame per second, numbered; read it); and in `index.html` a `<video>` per file. With `--fastlane`: `out/fastlane/app-previews/<asc-locale>/NN_<IDENT>_<id>.mp4` (for example `01_IPHONE_67_tour.mp4`), which `fastlane deliver` uploads (identifiers `IPHONE_67`, `IPHONE_55`, `IPHONE_47`, `IPAD_PRO_3GEN_129`, `IPAD_97`, `DESKTOP`); creative files go to `out/fastlane/creative/<asc-locale>/` and are uploaded by hand in App Store Connect.
+A filtered run (`--targets`, `--previews`, `--scenes`, `--slides`) rewrites `manifest.json` and `index.html` with only that run's output.
+Render time: about 1–2 minutes per preview per locale on a laptop, 3–5 minutes for a 4K creative video.
 Set `CHROME_PATH` if Chrome isn't installed in the default place.

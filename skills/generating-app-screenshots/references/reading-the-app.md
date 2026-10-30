@@ -61,6 +61,33 @@ to the content and let `mac-window` draw it.
 Save as `screens/<locale>/<name>.png`. Missing locales fall back to the language folder, then to `defaultLocale`
 (the renderer warns). The frame is chosen from the image's aspect ratio, so phone captures always get phone frames.
 
+## 2b. Record the app for previews
+
+App previews and the creative videos (header, search results, In-App Event) show **how the app works**, so they want a recording of the main flow. Stills work for a draft only. Record each device class you ship a preview for; a clip is cropped when its aspect is more than 2% off the device frame's screen.
+
+**iOS Simulator** (set the status bar override from §2 first)
+```bash
+mkdir -p recordings/en-US
+xcrun simctl io <udid> recordVideo --codec h264 --mask ignored recordings/en-US/flow.mov     # Ctrl-C stops (wait for it to finish writing)
+```
+Drive the app while it records: deep links (`xcrun simctl openurl booted myapp://stats`), `maestro test flow.yaml`, or by hand.
+
+**Android Emulator / device**
+```bash
+adb shell screenrecord --bit-rate 8000000 /sdcard/flow.mp4      # stops after 180 s or on Ctrl-C
+adb pull /sdcard/flow.mp4 recordings/en-US/flow.mp4
+```
+
+Rules for a good recording:
+- **Slow, deliberate gestures**, and about 1 s of pause on every screen: the video is cut into 15–30 s of scenes and viewers read at that pace.
+- No keyboard unless it is the point, no personal data, no debug banners, clean status bar.
+- **One recording per locale** (UI in that language), or one English recording with `"clipLocale": "en-US"` on the preview (the other locales then reuse it and the renderer stops warning that the UI language does not match).
+- One long recording can become several scenes: cut it with `clip: { "start": 12, "end": 19 }` and a caption per chapter.
+- HTML mocks do not record: a mock is a still (drift or scroll). A preview made only of stills and mocks is a draft; replace them with recordings before submitting.
+- Apple wants the previews to show real in-app use. Simulator recordings carry no audio; the renderer adds a silent stereo track (or your `music`).
+
+Point scenes at them with `"screen": "recordings/{locale}/flow.mov"` (see config.md → previews, and `examples/preview/`).
+
 ## 3. When no build can run: HTML mock screens
 
 Rebuild each chosen screen as `screens/<name>.html` from the real UI code: same layout, colors, icons, copy and realistic data.
