@@ -4,11 +4,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
 import { LAYOUTS, LAYOUT_INFO } from './layouts.mjs';
 
 const SKILL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EX = path.join(SKILL, 'examples');
+const FFMPEG = createRequire(import.meta.url)('ffmpeg-static');
 const argOut = process.argv.indexOf('--out');
 const OUT = path.resolve(argOut > 0 ? process.argv[argOut + 1] : path.join(SKILL, '../../docs'));
 const SHOTS = path.join(OUT, 'shots');
@@ -16,7 +19,7 @@ const REPO = 'https://github.com/dtthaison/app-screenshots-pro-skill';
 
 const TARGET_NAMES = {
   'ios-6.9': 'iPhone 6.9″', 'ipad-13': 'iPad 13″', 'android-phone': 'Android phone', 'play-feature-graphic': 'Play feature graphic',
-  iphone: 'iPhone', ipad: 'iPad', wide: 'Landscape', mac: 'Mac App Store', windows: 'Microsoft Store',
+  'preview-iphone': 'App preview, iPhone', 'header-video': 'Product page header video', 'app-header': 'Product page header', 'event-card': 'In-App Event card', iphone: 'iPhone', ipad: 'iPad', wide: 'Landscape', mac: 'Mac App Store', windows: 'Microsoft Store',
   'watch-ultra': 'Apple Watch Ultra', 'wear-os': 'Wear OS', tablet: 'Android tablet',
 };
 const LOCALES = [['en-US', 'English'], ['vi', 'Tiếng Việt'], ['de', 'Deutsch'], ['ar', 'العربية'], ['ja', '日本語']];
@@ -51,6 +54,14 @@ async function strip(src, key) {
   return { t: f, l: f, w: r.width, h: r.height };
 }
 
+// copy a rendered video into the site; re-encode when the render is heavier than the web budget
+function video(src, dest, { maxMB = 3, width, bitrate }) {
+  const to = path.join(OUT, dest);
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  if (fs.statSync(src).size <= maxMB * 1048576) fs.copyFileSync(src, to);
+  else execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', src, '-vf', `scale=${width}:-2`, '-c:v', 'libx264', '-b:v', bitrate, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'copy', to]);
+  bytes += fs.statSync(to).size;
+}
 const img = (s, alt, cls = '') => `<a class="shot ${cls}" href="${s.l}" data-full><img src="${s.t}" width="${s.w}" height="${s.h}" alt="${esc(alt)}" loading="lazy" decoding="async"></a>`;
 const fig = (s, alt, cap, title = '') => `<figure${title ? ` title="${esc(title)}"` : ''}>${img(s, alt)}<figcaption>${esc(cap)}</figcaption></figure>`;
 const proof = (name, s, body, cls = '') => `<div class="proof ${cls}"><p class="spec">${esc(name)} <span>${s.srcW} × ${s.srcH} px</span></p>${body}</div>`;
@@ -103,8 +114,27 @@ async function main() {
     sizes.push({ target, shots: await Promise.all(ms.map((m) => shot(m.src, `sizes/${target}-${m.slide}`))) });
   }
 
+  // app previews: web copies of the en-US videos (the renders are 8-20 MB), poster, and the two creative images
+  const pm = JSON.parse(fs.readFileSync(path.join(EX, 'preview/out/manifest.json'), 'utf8')).previews;
+  const pv = (target) => pm.find((p) => p.target === target && p.locale === 'en-US');
+  const pdir2 = path.join(EX, 'preview/out');
+  const tour = pv('preview-iphone'), head = pv('header-video');
+  if (!tour || !head) throw new Error('examples/preview/out has no en-US preview-iphone / header-video: run `npm run example:preview`');
+  video(path.join(pdir2, tour.file), 'shots/preview/tour.mp4', { width: 480, bitrate: '1M' });
+  video(path.join(pdir2, head.file), 'shots/preview/header.mp4', { width: 1280, bitrate: '800k' });
+  const tourPoster = await sharp(path.join(pdir2, tour.poster)).resize({ width: 480 }).png({ palette: true }).toFile(path.join(SHOTS, 'preview/tour.png'));
+  bytes += tourPoster.size;
+  const headPoster = await sharp(path.join(pdir2, head.poster)).resize({ width: 1280 }).png({ palette: true }).toFile(path.join(SHOTS, 'preview/header.png'));
+  bytes += headPoster.size;
+  const dim = async (f) => { const m = await sharp(f).metadata(); return { srcW: m.width, srcH: m.height }; };
+  const previews = {
+    tour: { ...tour, ...(await dim(path.join(pdir2, tour.poster))) }, head: { ...head, ...(await dim(path.join(pdir2, head.poster))) },
+    header: await shot(path.join(pdir2, 'app-header/en-US/01_header.png'), 'preview/app-header'),
+    event: await shot(path.join(pdir2, 'event-card/en-US/01_event.png'), 'preview/event-card'),
+  };
+
   const layoutCount = LAYOUTS.length;
-  const html = page({ snippet, hero, locSets, layouts, signature, patterns, storeView, devices, sizes, layoutCount });
+  const html = page({ snippet, hero, locSets, layouts, signature, patterns, storeView, devices, sizes, previews, layoutCount });
   fs.writeFileSync(path.join(OUT, 'index.html'), html);
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
   const n = fs.readdirSync(SHOTS, { recursive: true }).filter((f) => f.endsWith('.webp')).length;
@@ -199,6 +229,9 @@ figcaption{font-size:.85rem;color:var(--muted);margin-top:6px}
 .devs .proof{grid-column:span 12}
 .devs .proof.half{grid-column:span 6}
 .devs .proof.third{grid-column:span 4}
+.devs .proof.twothirds{grid-column:span 8}
+.pv video{display:block;width:100%;height:auto;border-radius:10px;background:#000}
+.pv.phone video{max-width:300px;margin:0 auto}
 .devs .row .shot{width:clamp(140px,15vw,180px)}
 .devs .land .row .shot{width:clamp(260px,34vw,440px)}
 .devs .watch .row .shot{width:clamp(120px,12vw,160px)}
@@ -215,17 +248,17 @@ dialog img{display:block;max-width:min(96vw,1600px);max-height:90vh;width:auto;h
 dialog button{position:fixed;top:14px;right:18px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:#000;font:600 1.4rem/1 system-ui;cursor:pointer}
 @media (prefers-reduced-motion:no-preference){.hero .set[data-loc="en-US"] .shot{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}${d.hero.shots.map((_, i) => `.hero .set .shot:nth-child(${i + 1}){animation-delay:${0.08 * i}s}`).join('')}}
 @keyframes rise{from{opacity:0;transform:translateY(24px)}}
-@media (max-width:820px){.intro,.head{grid-template-columns:1fr}.devs .proof.half,.devs .proof.third{grid-column:span 12}pre{max-height:300px}}
+@media (max-width:820px){.intro,.head{grid-template-columns:1fr}.devs .proof.half,.devs .proof.third,.devs .proof.twothirds{grid-column:span 12}pre{max-height:300px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header class="top"><b>App Screenshots Pro Skill</b><a href="samples/aptusfit/">Real app sample</a><a href="#install">Install</a><a href="${REPO}">GitHub</a></header>
+<header class="top"><b>App Screenshots Pro Skill</b><a href="samples/aptusfit/">Real app sample</a><a href="#previews">Previews</a><a href="#install">Install</a><a href="${REPO}">GitHub</a></header>
 
 <div class="intro">
   <div>
     <h1>Store screenshots, rendered from your code</h1>
-    <p class="lede">A Claude Code skill. Claude reads your app, writes the captions in every language you ship, and renders App Store and Google Play images at exact store sizes. Free, local and open source.</p>
+    <p class="lede">A Claude Code skill. Claude reads your app, writes the captions in every language you ship, and renders App Store and Google Play images at exact store sizes. It also renders app preview videos and the product page header, search and In-App Event assets. Free, local and open source.</p>
     <div class="cta"><a class="btn solid" href="#install">Install the plugin</a><a class="btn" href="${REPO}">View on GitHub</a><a class="btn" href="samples/aptusfit/">See a real app sample</a></div>
   </div>
   <div><p class="file">screenshots.config.json</p><pre>${highlightJson(d.snippet)}</pre></div>
@@ -263,6 +296,15 @@ dialog button{position:fixed;top:14px;right:18px;width:44px;height:44px;border-r
     ${proof(TARGET_NAMES.tablet, groups.tablet[0].s, `<div class="row">${groups.tablet.map((x) => img(x.s, label(x.name))).join('')}</div>`, 'third')}
     ${proof(TARGET_NAMES['watch-ultra'], groups['watch-ultra'][0].s, `<div class="row">${groups['watch-ultra'].map((x) => img(x.s, 'Apple Watch screen')).join('')}</div>`, 'watch third')}
     ${proof(TARGET_NAMES['wear-os'], groups['wear-os'][0].s, `<div class="row">${groups['wear-os'].map((x) => img(x.s, 'Wear OS screen')).join('')}</div>`, 'watch third')}
+  </div>
+</section>
+
+<section id="previews">
+  <div class="head"><h2>App previews and creative assets</h2><p>The skill turns one screen recording into the App Store app preview: captions and a device frame composited in, the right size and H.264 level per device, plus a poster frame. The same recording drives the product page header video and the Event card. The videos below are played from the example config.</p></div>
+  <div class="devs">
+    ${proof(TARGET_NAMES['preview-iphone'], d.previews.tour, `<div class="pv phone"><video controls loop muted playsinline preload="metadata" poster="shots/preview/tour.png" src="shots/preview/tour.mp4" aria-label="App preview, iPhone"></video></div>`, 'third')}
+    ${proof(TARGET_NAMES['header-video'], d.previews.head, `<div class="pv"><video controls loop muted playsinline preload="metadata" poster="shots/preview/header.png" src="shots/preview/header.mp4" aria-label="Product page header video"></video></div>`, 'twothirds')}
+    ${proof('Product page header and In-App Event card', d.previews.header, `<div class="grid wide">${fig(d.previews.header, 'Product page header image', TARGET_NAMES['app-header'])}${fig(d.previews.event, 'In-App Event card image', TARGET_NAMES['event-card'])}</div>`)}
   </div>
 </section>
 
@@ -311,4 +353,4 @@ function highlightJson(s) {
   return esc(s).replace(/(&quot;[^&]*?&quot;)(\s*:)?/g, (m, str, colon) => colon ? `<span class="k">${str}</span>${colon}` : `<span class="s">${str}</span>`);
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+main().catch((e) => { console.error(process.env.DEBUG ? e.stack : e.message); process.exit(1); });
