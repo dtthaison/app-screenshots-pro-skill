@@ -13,7 +13,7 @@ import { chromium } from 'playwright-core';
 import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
 import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
-import { buildLayout, canvasClass, screenAspectError } from './layouts.mjs';
+import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
@@ -550,7 +550,9 @@ async function resolvePreviews({ ffmpeg }) {
         const { s, th, els } = slideElements({ ...scene, labels: timed.length ? undefined : scene.labels }, target, locale, W, H, base);
         const dev = els.find((e) => e.type === 'device' && e.id === 'device');
         // full-screen / caption-band: judge the recording (or still) against the canvas
-        const shownMeta = imageMeta.get(scene.screen);
+        // (HTML mock screens have no imageMeta and stay unchecked)
+        const shownMeta = info ? imageMeta.get(scene.screen)
+          : stillMeta(scene.screen, { cands: (f) => screenCands(f, locale), abs, exists: (f) => fs.existsSync(f), meta: imageMeta });
         const aspectMsg = shownMeta && screenAspectError(s.layout, shownMeta.w, shownMeta.h, W, H);
         if (aspectMsg) { if (s.layout === 'full-screen') throw new Error(aspectMsg); warnSet.add(aspectMsg); }
         let clip = null, overflow = 0;

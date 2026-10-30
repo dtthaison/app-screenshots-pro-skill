@@ -59,6 +59,24 @@ export const LAYOUTS = Object.keys(LAYOUT_INFO);
 const DESK_WIDE = ['text-top', 'hero', 'device-hero', 'tilt-left', 'tilt-right', 'text-left', 'text-right', 'laptop-phone', 'phone-watch'];
 const WIDE_OK = ['phone-watch', 'laptop-phone', 'caption-top', 'text-left', 'text-right', 'caption-only', 'blank', 'frameless', 'feature-grid', 'steps', 'stats', 'review', 'awards', 'landscape', 'mosaic', 'full-screen', 'caption-band', 'end-card'];
 
+// A background (string, {color}, {gradient:{stops}}) as one solid CSS colour. Only a trailing position ("0%") is stripped
+// from a stop, so "rgba(1, 2, 3, .5) 0%" survives.
+export function solidBackground(bg, fallback = '#000') {
+  if (typeof bg === 'string') return bg;
+  if (bg?.color) return bg.color;
+  const stop = bg?.gradient?.stops?.[0];
+  if (typeof stop === 'string') return stop.replace(/\s+-?[\d.]+(%|px)?$/, '').trim() || fallback;
+  return fallback;
+}
+
+// imageMeta of a still given by the path in a config: the first candidate (locale fallbacks) that exists, under the
+// absolute key loadImageMeta uses. HTML mock screens and unknown files have no meta and stay unchecked.
+export function stillMeta(src, { cands, abs, exists, meta }) {
+  if (typeof src !== 'string') return null;
+  const hit = cands(src.split('?')[0]).map((c) => abs(c.file)).find((p) => exists(p));
+  return (hit && meta.get(hit)) || null;
+}
+
 // Aspect rules for a recording (or still) of clipW×clipH on a W×H canvas. Returns an ERROR/WARN message or null.
 export function screenAspectError(layout, clipW, clipH, W, H) {
   if (layout === 'full-screen') {
@@ -539,8 +557,7 @@ export function buildLayout(slide, ctx) {
     // ---------------- real-footage layouts ----------------
     case 'full-screen': {
       const bottom = slide.caption?.position === 'bottom';
-      const bg = theme.background;
-      const solid = typeof bg === 'string' ? bg : bg?.color || bg?.gradient?.stops?.[0]?.split(' ')[0] || '#000';
+      const solid = solidBackground(slide.background ?? theme.background);
       const edge = `color-mix(in srgb, ${solid} 70%, transparent)`;
       const scrim = { type: 'shape', id: 'scrim', x: 50, y: bottom ? 78 : 0, w: 100, h: 22, z: 3,
         fill: { angle: bottom ? 0 : 180, stops: [edge, 'transparent'] } };
@@ -552,7 +569,7 @@ export function buildLayout(slide, ctx) {
     case 'caption-band': {
       const bottom = slide.caption?.position === 'bottom';
       const bandY = bottom ? 82 : 0, top = bottom ? 0 : 18;
-      const band = { type: 'shape', id: 'band', x: 50, y: bandY, w: 100, h: 18, z: 3, fill: theme.background || '#000' };
+      const band = { type: 'shape', id: 'band', x: 50, y: bandY, w: 100, h: 18, z: 3, fill: solidBackground(slide.background ?? theme.background) };
       const d = withFit(device({ model: 'none', style: 'frameless', radius: 0, shadow: false, x: 50 }), top, top + 82, 100);
       d.y = top + Math.max(0, (82 - heightPct(d, W, H)) / 2);
       return [band, caption({ y: bandY, h: 18, valign: 'center', z: 5 }), d];
