@@ -46,12 +46,16 @@ Paths are relative to the config file. Coordinates for every element:
 | `play-feature-graphic` | 1024×500 | exactly one image |
 | `og-image`, `x-post`, `product-hunt`, `instagram`, `story` | | social promo, not uploaded |
 
-Append `@landscape` (e.g. `"ipad-13@landscape"`). Custom: `{ "id": "promo", "w": 1200, "h": 628, "model": "iphone" }`.
+Append `@landscape` (e.g. `"ipad-13@landscape"`), or `@styled` to an Apple Watch target (below). Custom: `{ "id": "promo", "w": 1200, "h": 628, "model": "iphone" }`.
 
 **Raw targets** (`raw: true`: the watches) output just the slide's `screen`, scaled to fill the exact size: no frame, caption,
 background or panorama. Give watch slides their own screens and limit them with the family key:
 `{ "id": "watch-1", "targets": ["watch"], "screen": "screens/watch.html", "byTarget": { "wear-os": { "screen": "screens/watch-round.html" } } }`.
 `byTarget`, `targets` and `skipTargets` accept the target id, base id, store (`ios play msstore social`) or family (`watch desktop`).
+**Styled Apple Watch shots**: `"watch-ultra@styled"` (any Apple Watch target) keeps the store size but renders background and
+caption like a phone slide; App Store Connect accepts these and rounds the corners itself, so keep the caption short and centered.
+Watch slides default to `watch-hero` there, with a strap-less watch filling the canvas under a one-line `title`. `--fastlane`
+exports them as watch screenshots. Wear OS has no `@styled`: Google Play rejects captioned watch shots.
 Apple changes its table yearly — check the App Store Connect "Screenshot specifications" page when unsure.
 
 ## theme
@@ -149,8 +153,8 @@ See all of them rendered: `examples/gallery/out/index.html` (config: `examples/g
 
 | layout | composition | extra slide fields | use for |
 |---|---|---|---|
-| `phone-watch` | phone with a watch in front, lower right | `screen2` (watch UI), `watchModel` (`apple-watch` default, `wear-os` on Play), `phoneModel`, `watch: {color, band}` | "also on your wrist" |
-| `watch-hero` | one big watch with straps under the caption | `screen` = watch UI, `watchModel`, `device: {color, band}` | watch launch, social, website |
+| `phone-watch` | phone with a watch in front, lower right | `screen2` (watch UI), `watchModel` (`apple-watch` default, `wear-os` on Play), `phoneModel`, `watch: {color, band}` (`band: false` for the case alone) | "also on your wrist" |
+| `watch-hero` | one big watch with straps under the caption (strap-less on a `@styled` watch target) | `screen` = watch UI, `watchModel`, `device: {color, band}` (`band: false` hides the straps) | watch launch, social, website, styled watch store shots |
 | `laptop-phone` | laptop with a phone in front (tall and wide canvases) | `screen2` (desktop UI), `laptopModel` (`macbook`; `desktop` on Windows), `device2: {color}` | cross-platform, sync |
 
 All device frames rendered: `examples/devices/out/index.html` (config: `examples/devices/devices.config.json`).

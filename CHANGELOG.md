@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.2 (2026-10-30)
 
+- Apple Watch targets take `@styled` (e.g. `"watch-ultra@styled"`): background and caption at the store size, a strap-less watch via `watch-hero` by default, still exported by `--fastlane` as watch screenshots. Wear OS stays raw.
+- `phone-watch` on tall canvases: a bigger phone (70% wide, higher up) and the watch moved down with it, so less of the canvas is empty.
 - Showcase: a real app sample (AptusFIT) with 31 options in 12 languages, previewed as App Store and Google Play listings, at `docs/samples/aptusfit/`.
 
 ## 1.0.1 (2026-10-29)

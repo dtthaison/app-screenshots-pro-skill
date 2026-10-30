@@ -60,6 +60,11 @@ export function resolveTarget(spec) {
   if (!t) throw new Error(`Unknown target "${spec}". Known: ${Object.keys(TARGETS).join(', ')}`);
   const out = { ...t, id: spec, baseId: id };
   if (mod === 'landscape' && out.h > out.w) [out.w, out.h] = [out.h, out.w];
+  // Apple accepts captioned watch shots at the store size (it rounds the corners itself); Wear OS rejects them
+  if (mod === 'styled') {
+    if (out.store !== 'ios' || out.family !== 'watch') throw new Error(`"@styled" is for Apple Watch targets only, not "${id}"`);
+    out.raw = false;
+  }
   out.landscape = out.w > out.h;
   return out;
 }
