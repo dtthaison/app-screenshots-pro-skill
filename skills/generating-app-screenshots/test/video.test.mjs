@@ -30,8 +30,11 @@ test('push moves both scenes horizontally', () => {
   const tl = buildTimeline({ transition: 'push' }, [{ id: 'a' }, { id: 'b' }]);
   const s = stateAt(tl, 3.7).scenes; assert.ok(s[0].tx < 0 && s[1].tx > 0 && s[1].tx < 1);
 });
-test('rise entrance: device starts 6% low and lands by 0.6s', () => {
-  const tl = buildTimeline({}, [{ id: 'a' }]);
+test('rise entrance: device starts 6% low and lands by 0.6s (scene 1 defaults to none; later scenes rise)', () => {
+  const first = buildTimeline({}, [{ id: 'z' }, { id: 'a' }]);
+  assert.equal(first.scenes[0].entrance, 'none'); assert.equal(first.scenes[1].entrance, 'rise');
+  assert.deepEqual(stateAt(first, 0).scenes[0].device, { opacity: 1, dy: 0 });
+  const tl = buildTimeline({}, [{ id: 'a', in: 'rise' }]);
   assert.equal(stateAt(tl, 0).scenes[0].device.dy, 0.06);
   assert.equal(stateAt(tl, 0.6).scenes[0].device.dy, 0);
   assert.equal(stateAt(tl, 0.05).scenes[0].caption.opacity, 0);   // 0.1 s delay
@@ -72,8 +75,10 @@ test('continuous scene: the device skips its entrance, caption and labels still 
   assert.equal(buildTimeline({}, [{ id: 'a', continuous: true }]).scenes[0].continuous, false);  // scene 1 has nothing to continue
 });
 test('sameState detects rest frames', () => {
-  const tl = buildTimeline({}, [{ id: 'a', motion: 'none' }]);
+  const tl = buildTimeline({}, [{ id: 'a', motion: 'none', in: 'rise' }]);
   assert.ok(sameState(stateAt(tl, 1), stateAt(tl, 1.5))); assert.ok(!sameState(stateAt(tl, 0.1), stateAt(tl, 0.2)));
+  const still = buildTimeline({}, [{ id: 'a', motion: 'none' }]);                 // scene 1 at rest from frame 0
+  assert.ok(sameState(stateAt(still, 0), stateAt(still, 0.5)));
 });
 test('poster: default 5, scene id → rest time, inside a transition warns', () => {
   const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', duration: 8 }]);
@@ -81,7 +86,9 @@ test('poster: default 5, scene id → rest time, inside a transition warns', () 
   assert.equal(posterTime(tl, 'b').time, 4.1);                  // the entrance (0.1 delay + 0.5 caption) starts with the 0.5 crossfade: 4 + 0.6 − 0.5
   assert.deepEqual(posterTime(tl, 'b').warnings, []);
   assert.match(posterTime(tl, 3.8).warnings[0], /transition/);
-  assert.match(posterTime(tl, 0.2).warnings[0], /entrance|fade/);
+  assert.deepEqual(posterTime(tl, 0.2).warnings, []);                                   // scene 1 has no entrance by default
+  const rising = buildTimeline({}, [{ id: 'a', in: 'rise' }, { id: 'b' }]);
+  assert.match(posterTime(rising, 0.2).warnings[0], /entrance/);
 });
 test('checkDuration against target.video', () => {
   const tl = buildTimeline({}, [{ id: 'a', duration: 10 }]);
@@ -99,8 +106,8 @@ test('scroll keeps scroll from 2% overflow, drifts below', () => {
 test('poster is clamped to the preview and to the scene, with a warning', () => {
   const short = buildTimeline({}, [{ id: 'a', duration: 3 }]);
   const d = posterTime(short); assert.equal(d.time, 3); assert.match(d.warnings[0], /outside/);
-  const tl = buildTimeline({}, [{ id: 'a', duration: 0.5 }, { id: 'b' }]);
-  const p = posterTime(tl, 'a'); assert.equal(p.time, 0); assert.match(p.warnings[0], /outside/);   // 0.5 s end − 0.5 s crossfade out
+  const tl = buildTimeline({}, [{ id: 'a', duration: 0.5, in: 'rise' }, { id: 'b' }]);
+  const p = posterTime(tl, 'a'); assert.equal(p.time, 0); assert.match(p.warnings[0], /outside/);   // rest 0.6 s > 0.5 s end − 0.5 s crossfade out = 0
 });
 test('poster rest time uses the entrance length: in none rests at the scene start, once the transition is over', () => {
   const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', in: 'none', duration: 8 }]);
