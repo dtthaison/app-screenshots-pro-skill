@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "PennyWise",
+    "category": "finance",
+    "promise": "Budgeting without spreadsheets"
+  },
+  "signals": [
+    "charts",
+    "replaces-chore",
+    "progress"
+  ],
+  "moments": [
+    {
+      "id": "scan-receipt",
+      "title": "Scan a receipt into an expense",
+      "signals": [
+        "replaces-chore"
+      ],
+      "reach": "deep link pennywise://add?demo=receipt",
+      "automatable": true,
+      "seconds": 5
+    },
+    {
+      "id": "budget-chart",
+      "title": "Monthly budget chart",
+      "signals": [
+        "charts",
+        "progress"
+      ],
+      "reach": "tap tab-budget",
+      "automatable": true,
+      "seconds": 4
+    },
+    {
+      "id": "monthly",
+      "title": "Month over month progress",
+      "signals": [
+        "progress"
+      ],
+      "reach": "tap tab-months",
+      "automatable": true,
+      "seconds": 3
+    }
+  ],
+  "owner": {
+    "audience": "people who dread budgeting",
+    "mustShow": [],
+    "mustAvoid": [],
+    "channels": [
+      "app-store"
+    ],
+    "tone": "calm",
+    "occasion": "launch",
+    "confirmed": true
+  }
+}

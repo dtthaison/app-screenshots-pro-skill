@@ -1,0 +1,87 @@
+{
+  "app": {
+    "name": "AptusFIT",
+    "category": "fitness",
+    "promise": "An AI coach that plans, logs and adapts to your gym"
+  },
+  "signals": [
+    "ai-stream",
+    "timer",
+    "live-update",
+    "sheet",
+    "progress",
+    "counter",
+    "watch-app",
+    "daily-habit"
+  ],
+  "moments": [
+    {
+      "id": "log-set",
+      "title": "Log a set, rest timer starts",
+      "signals": [
+        "live-update",
+        "timer"
+      ],
+      "reach": "deep link marketing?action=session, tap set-done-4-0",
+      "automatable": true,
+      "seconds": 4
+    },
+    {
+      "id": "swap",
+      "title": "Swap an exercise in the sheet",
+      "signals": [
+        "sheet"
+      ],
+      "reach": "tap swap-exercise",
+      "automatable": true,
+      "seconds": 3
+    },
+    {
+      "id": "progress",
+      "title": "Weekly progress and counters",
+      "signals": [
+        "progress",
+        "counter"
+      ],
+      "reach": "deep link marketing?tab=progress",
+      "automatable": true,
+      "seconds": 3
+    },
+    {
+      "id": "coach",
+      "title": "Coach writes a workout live",
+      "signals": [
+        "ai-stream"
+      ],
+      "reach": "coach-chat, type prompt, send",
+      "automatable": "network",
+      "seconds": 20
+    },
+    {
+      "id": "paywall",
+      "title": "Subscription paywall",
+      "signals": [
+        "paywall"
+      ],
+      "reach": "deep link marketing?action=paywall",
+      "automatable": true,
+      "seconds": 3
+    }
+  ],
+  "owner": {
+    "audience": "gym-goers who want a coach",
+    "mustShow": [
+      "coach"
+    ],
+    "mustAvoid": [
+      "paywall"
+    ],
+    "channels": [
+      "app-store"
+    ],
+    "tone": "premium",
+    "occasion": "refresh",
+    "disclose": "Subscription required for the AI coach",
+    "confirmed": true
+  }
+}
