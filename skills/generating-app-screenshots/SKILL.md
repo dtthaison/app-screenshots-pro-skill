@@ -46,7 +46,7 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
 
 | Need | Config |
 |---|---|
-| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); Mac `mac`; Windows `windows`; watch `watch-ultra`, `wear-os` (raw UI only) |
+| Which store sizes | `"targets": ["ios-6.9","ipad-13","android-phone","play-feature-graphic"]` (+ `@landscape`); Mac `mac`; Windows `windows`; watch `watch-ultra`, `wear-os` (raw UI; Apple Watch may take `@styled`) |
 | Device frames | `"device": { "model": "iphone\|iphone-notch\|iphone-home\|ipad\|android\|android-flat\|android-tablet\|apple-watch\|wear-os\|macbook\|desktop\|mac-window\|windows-window\|browser\|none" }` — `examples/devices/` |
 | Cross-device | layouts `phone-watch` `watch-hero` `laptop-phone`; slide `targets: ["watch"]` / `["desktop"]` to give a family its own slides |
 | Layout (41) | device: `text-top text-bottom hero device-hero screen-hero tilt-left tilt-right corner frameless landscape` · multi: `two-devices three-devices phone-tablet before-after mosaic` · callouts: `pop-out metric annotated` · proof/info: `feature-grid steps stats review awards split-photo caption-only` · wide: `text-left text-right` · `caption-top` (caption band only) · `blank` · **signature**: `spotlight big-type ticker arch orbit lens layers notify deck` (see `examples/signature/`) |
@@ -68,6 +68,6 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
 - **iPhone screenshot on an iPad target** → `model: "auto"` picks the frame from the screenshot's aspect, so the iPad slot shows a phone. Capture real iPad screens; Apple rejects stretched phone UI.
 - **Ignoring `WARN text is covered`** → a device sits on top of the caption; move one.
 - **Feature graphic gets every slide** → mark other slides `"skipTargets": ["play-feature-graphic"]`.
-- **Captions or frames on watch store shots** → Wear OS rejects them and Apple masks watch shots itself; the `watch-*`/`wear-os` targets render the bare UI. Put framed watches in phone slides (`phone-watch`) or social images instead.
+- **Captions or frames on watch store shots** → Wear OS rejects them, so `wear-os` renders the bare UI. Apple masks watch shots itself: `watch-*` is bare by default, and `watch-ultra@styled` adds background and a short caption. Framed watches belong in phone slides (`phone-watch`) or social images.
 - **Phone slides leaking into watch/Mac/Windows targets** → give each family its own slides with `"targets": ["watch"]` / `["desktop"]`, and `"skipTargets"` on the phone ones.
 - **Fonts missing a script** → the renderer adds Noto fonts for ja/ko/zh/ar/he/th/hi automatically; keep `font.weights` to weights the Google font has.

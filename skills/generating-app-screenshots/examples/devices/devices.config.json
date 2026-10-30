@@ -24,6 +24,7 @@
     "mac",
     "windows",
     "watch-ultra",
+    "watch-ultra@styled",
     "wear-os"
   ],
   "output": "out",
@@ -285,7 +286,19 @@
         "wear-os": {
           "screen": "screens/watch-round.html"
         }
-      }
+      },
+      "skipTargets": [
+        "watch-ultra@styled"
+      ]
+    },
+    {
+      "id": "watch-store-styled",
+      "targets": [
+        "watch-ultra@styled"
+      ],
+      "preset": "aurora",
+      "title": "Your streak, **at a glance**",
+      "screen": "screens/watch.html"
     }
   ]
 }

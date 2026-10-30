@@ -79,7 +79,9 @@ export function buildLayout(slide, ctx) {
   const cls = canvasClass(W, H);
   const t = T[cls];
   const tall = cls === 'tall';
-  let layout = slide.layout || 'text-top';
+  // a styled watch target (watch-ultra@styled) defaults to the one-big-watch layout
+  const onWatch = ctx.target?.family === 'watch';
+  let layout = slide.layout || (onWatch ? 'watch-hero' : 'text-top');
   const deskModel = (ctx.modelFor ? ctx.modelFor(slide.screen) : ctx.target?.model) || ctx.target?.model;
   const desk = cls === 'wide' && isDesktopModel(slide.device?.model || deskModel);
   if (cls === 'wide' && !WIDE_OK.includes(layout) && !(desk && DESK_WIDE.includes(layout))) layout = 'text-left';
@@ -136,7 +138,7 @@ export function buildLayout(slide, ctx) {
   switch (layout) {
     case 'phone-watch': {
       const wide = cls === 'wide';
-      const ph = withFit(device({ x: wide ? 64 : tall ? 38 : 40, model: phoneModel, z: 2 }), wide ? 10 : t.dTop + 1, wide ? 108 : t.dBot + 4, wide ? 22 : tall ? 60 : 44);
+      const ph = withFit(device({ x: wide ? 64 : 40, model: phoneModel, z: 2 }), wide ? 10 : tall ? t.dTop - 1.5 : t.dTop + 1, wide ? 108 : t.dBot + 4, wide ? 22 : tall ? 70 : 44);
       const wa = device({ x: wide ? 84 : tall ? 74 : 70, model: watchModel, screen: slide.screen2 || slide.screen, z: 4, shadowOpacity: 0.4 }, 'watch');
       wa.w ??= wide ? 15 : tall ? 40 : 30;
       wa.y ??= wide ? 50 - heightPct(wa, W, H) / 2 : ph.y + heightPct(ph, W, H) * 0.62 - heightPct(wa, W, H) / 2;
@@ -144,9 +146,10 @@ export function buildLayout(slide, ctx) {
     }
 
     case 'watch-hero': {
-      const wa = device({ x: 50, model: watchModel, z: 3, shadowOpacity: 0.4 }, 'device');
-      wa.w ??= cls === 'wide' ? 26 : tall ? 66 : 50;
-      wa.y ??= (cls === 'wide' ? 50 : tall ? 63 : 60) - heightPct(wa, W, H) / 2;
+      // on a watch canvas the straps would only crop at the edges, so the case alone fills it
+      const wa = device({ x: 50, model: watchModel, z: 3, shadowOpacity: 0.4, ...(onWatch ? { band: false } : {}) }, 'device');
+      wa.w ??= onWatch ? 70 : cls === 'wide' ? 26 : tall ? 66 : 50;
+      wa.y ??= onWatch ? 17 : (cls === 'wide' ? 50 : tall ? 63 : 60) - heightPct(wa, W, H) / 2;
       if (cls === 'wide') { wa.x = 72; return [sideCaption(), wa]; }
       return [caption({ z: 6 }), wa];
     }
