@@ -13,36 +13,51 @@ const ease = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : 1 - 2 ** (-10 * p));
 
 // Scene 1 keeps its caption complete at frame 0 (hard loop, owner preference): the theme/preview default does not
 // apply to it; only a captionMotion set on the scene itself does.
-export function resolveCaptionMotion(index, scene = {}, preview = {}, themeVideo = {}) {
-  if (scene.captionMotion != null) return scene.captionMotion;
-  return index === 0 ? 'rise' : preview.captionMotion ?? themeVideo.captionMotion ?? 'rise';
+// A caption without a title has nothing to animate (and the eyebrow/subtitle would show with no entrance): rise instead.
+export function resolveCaptionMotion(index, scene = {}, preview = {}, themeVideo = {}, hasTitle = true) {
+  const m = scene.captionMotion != null ? scene.captionMotion : index === 0 ? 'rise' : preview.captionMotion ?? themeVideo.captionMotion ?? 'rise';
+  return !hasTitle && (m === 'words' || m === 'lines' || m === 'pop') ? 'rise' : m;
 }
 
 // "Swap in **one tap**" -> one unit per space-separated word, keeping the **highlight** state across words.
 // A word that mixes highlighted and plain text (`**tap**.`) keeps its markers in `word` with hl false.
-// Text without spaces (ja, zh, th) stays a single unit.
+// Text without spaces (ja, zh, th) stays a single unit. A manual line break (a real newline or a literal backslash-n,
+// as rich() reads them) becomes a `{ br: true }` marker; it is not a word, so indices and counts cover words only.
 export function splitWords(text) {
   const units = [];
-  let hl = false, open = false;            // open: the last unit has no whitespace after it yet
-  for (const seg of String(text ?? '').split('**')) {
-    const parts = seg.split(/\s+/);
-    parts.forEach((piece, k) => {
-      if (k > 0) open = false;
-      if (!piece) return;
-      if (open) {
-        const u = units.at(-1);
-        if (!u.mixed) { u.word = u.hl ? `**${u.word}**` : u.word; u.mixed = true; u.hl = false; }
-        u.word += hl ? `**${piece}**` : piece;
-      } else units.push({ word: piece, hl, mixed: false });
-      open = true;
-    });
+  let hl = false;
+  String(text ?? '').split(/\\n|\n/).forEach((line, li) => {
+    if (li > 0) units.push({ br: true });
+    let open = false;                       // open: the last unit has no whitespace after it yet
+    for (const seg of line.split('**')) {
+      seg.split(/\s+/).forEach((piece, k) => {
+        if (k > 0) open = false;
+        if (!piece) return;
+        if (open) {
+          const u = units.at(-1);
+          if (!u.mixed) { u.word = u.hl ? `**${u.word}**` : u.word; u.mixed = true; u.hl = false; }
+          u.word += hl ? `**${piece}**` : piece;
+        } else units.push({ word: piece, hl, mixed: false });
+        open = true;
+      });
+      hl = !hl;
+    }
+    // the final toggle above flips once per segment; undo the one past the last segment
     hl = !hl;
-  }
-  return units.map(({ word, hl: h }) => ({ word, hl: h }));
+  });
+  return units.map((u) => (u.br ? u : { word: u.word, hl: u.hl }));
 }
 
+export const wordCount = (units) => units.filter((u) => !u.br).length;
+
 export function wordsHtml(units, richFn) {
-  return units.map((u) => `<span class="kw" style="display:inline-block;overflow:hidden;vertical-align:bottom"><span class="kwi" style="display:inline-block">${richFn(u.hl ? `**${u.word}**` : u.word)}</span></span>`).join(' ');
+  let html = '', prevWord = false;
+  for (const u of units) {
+    if (u.br) { html += '<br>'; prevWord = false; continue; }
+    html += `${prevWord ? ' ' : ''}<span class="kw" style="display:inline-block;overflow:hidden;vertical-align:bottom;padding:.2em .1em .35em;margin:-.2em -.1em -.35em"><span class="kwi" style="display:inline-block">${richFn(u.hl ? `**${u.word}**` : u.word)}</span></span>`;
+    prevWord = true;
+  }
+  return html;
 }
 
 // Per-unit progress 0..1 at caption time t. For `lines`, n is the word count (the most lines there can be);
