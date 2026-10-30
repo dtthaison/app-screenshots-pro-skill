@@ -58,6 +58,17 @@ test('labels fade in at `at` and out at `until`', () => {
   assert.equal(stateAt(tl, 1.3).scenes[0].labels[0].opacity, 1);
   assert.equal(stateAt(tl, 2.3).scenes[0].labels[0].opacity, 0);
 });
+test('continuous scene: the device skips its entrance, caption and labels still animate', () => {
+  const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', continuous: true, labels: [{ at: 1, text: 'X' }] }, { id: 'c' }]);
+  assert.deepEqual(tl.scenes.map((s) => s.continuous), [false, true, false]);
+  for (const t of [3.5, 3.6, 3.8, 4, 4.3, 6]) assert.deepEqual(stateAt(tl, t).scenes[1].device, { opacity: 1, dy: 0 }, `t=${t}`);
+  const s = stateAt(tl, 3.7).scenes[1];
+  assert.ok(s.caption.opacity < 1 && s.caption.dy > 0);           // caption rises in as usual
+  assert.equal(stateAt(tl, 4.9).scenes[1].labels[0].opacity, 0); assert.equal(stateAt(tl, 5.4).scenes[1].labels[0].opacity, 1);
+  assert.ok(s.opacity > 0 && s.opacity < 1);                       // the scene itself still crossfades
+  assert.ok(stateAt(tl, 7.7).scenes[2].device.dy > 0);             // a scene without the flag rises
+  assert.equal(buildTimeline({}, [{ id: 'a', continuous: true }]).scenes[0].continuous, false);  // scene 1 has nothing to continue
+});
 test('sameState detects rest frames', () => {
   const tl = buildTimeline({}, [{ id: 'a', motion: 'none' }]);
   assert.ok(sameState(stateAt(tl, 1), stateAt(tl, 1.5))); assert.ok(!sameState(stateAt(tl, 0.1), stateAt(tl, 0.2)));
