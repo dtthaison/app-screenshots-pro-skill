@@ -16,9 +16,10 @@ export function handover({ preview, concept, results = [], ramps = [], warnings 
   for (const r of results) out.push(`| ${r.file} | ${secs(r.length)} | ${timeCode(r.posterTime)} | ${r.warnings ? `${r.warnings} WARN` : 'clean'} |`);
 
   out.push('', '## Cut', '');
-  if (ramps.length) {
-    for (const r of ramps) out.push(`- ${r.scene}: ${secs(r.saved)} saved by the speed ramp`);
-    out.push(`- total: ${secs(ramps.reduce((a, r) => a + r.saved, 0))} saved`);
+  const cut = ramps.map((r) => ({ scene: r.scene, saved: Number(r.saved.toFixed(1)) })).filter((r) => r.saved > 0);   // total adds up the printed values
+  if (cut.length) {
+    for (const r of cut) out.push(`- ${r.scene}: ${secs(r.saved)} saved by the speed ramp`);
+    out.push(`- total: ${secs(cut.reduce((a, r) => a + r.saved, 0))} saved`);
   } else out.push('Nothing was ramped or cut.');
 
   out.push('', '## Warnings and notes', '');
@@ -44,7 +45,7 @@ export const forPreview = (lines, id) => lines.filter((l) => {
 
 // network moments to accept: the ones the preview's scenes name, else every network moment of the brief; no brief -> none
 export function networkMoments(brief, named = []) {
-  const net = (brief?.moments ?? []).filter((m) => m?.automatable === 'network').map((m) => m.id);
+  const net = (Array.isArray(brief?.moments) ? brief.moments : []).filter((m) => m?.automatable === 'network').map((m) => m.id);
   const hit = net.filter((id) => named.includes(id));
   return named.length ? hit : net;
 }

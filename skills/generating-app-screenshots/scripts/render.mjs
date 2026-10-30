@@ -681,7 +681,7 @@ async function resolvePreviews({ ffmpeg }) {
       for (const n of r.notes) notes.push(`[${tag}] ${n}`);
     }
     if (drafts.length) notes.push(`[${tag}] draft stills stand in for missing recordings (${drafts.join(', ')}) — record the app for the final preview`);
-    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet, ramps, drafts, moments: scenes.map((e) => e.scene.moment).filter(Boolean) });
+    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet, ramps, drafts, moments: scenes.map((e) => e.scene.moment).filter(Boolean)   // optional scene field: a preview-brief.json moment id });
   }
   return jobs;
 }
@@ -1207,7 +1207,7 @@ async function main() {
     const { target: t, locale, preview } = p.job;
     if (fs.statSync(p.file).size > t.video.maxMB * 1024 * 1024) { errors.push(`${p.file}: larger than ${t.video.maxMB} MB`); p.failed = true; }
     if (preview.music && t.baseId === 'search-video') warn(`[${p.tag}] search results videos cannot be unmuted — music is wasted bytes`);
-    if (p.stills && t.family === 'creative') notes.push(`${t.id}/${locale}/${preview.id}.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`);
+    if (p.stills && t.family === 'creative') notes.push(`[${t.id}/${locale}/${preview.id}] ${t.id}/${locale}/${preview.id}.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`);
     else if (p.stills && t.asc) notes.push(`[${p.tag}] every scene is a still — fine for a draft; record the app for the final preview`);
     for (const w of p.posterWarnings) warn(`[${p.tag}] ${w}`);
     (pvKey[`${t.id}|${locale}`] ||= []).push(p);
@@ -1313,9 +1313,10 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
   // hand-over report per preview (not under --check: nothing was rendered)
   if (!CHECK && shipped.length) {
     const rdir = path.join(OUT, '_preview');
-    fs.mkdirSync(rdir, { recursive: true });
     for (const id of [...new Set(shipped.map((p) => p.job.preview.id))]) {
-      const mine = shipped.filter((p) => p.job.preview.id === id), first = mine[0].job;
+      try {
+      fs.mkdirSync(rdir, { recursive: true });
+      const mine = shipped.filter((p) => p.job.preview.id === id), first = mine[0].job;   // ramps depend on the clip, not on caption or locale, so Cut and the beats come from the first job
       const pw = forPreview(warnings, id), pn = forPreview(notes, id);
       const results = mine.map((p) => ({ tag: p.tag, file: path.relative(process.cwd(), p.file), length: p.job.timeline.total, posterTime: p.posterTime,
         warnings: new Set(pw.filter((w) => w.startsWith(`[${p.tag}`))).size }));
@@ -1326,6 +1327,7 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
       fs.writeFileSync(rf, md);
       const saved = first.ramps.reduce((a, r) => a + r.saved, 0), nw = results.reduce((a, r) => a + r.warnings, 0);
       console.log(`  report ${path.relative(OUT, rf)}: ${results.length} files, ${nw ? `${nw} WARN` : 'clean'}${saved ? `, ${saved.toFixed(1)}s cut` : ''}`);
+      } catch (e) { warn(`report ${id} not written: ${e.message}`); }
     }
   }
 

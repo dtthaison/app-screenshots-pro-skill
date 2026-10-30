@@ -32,3 +32,13 @@ test('networkMoments: named ones, else all, no brief none', () => {
   assert.deepEqual(networkMoments(brief, []), ['a', 'b']);
   assert.deepEqual(networkMoments(null, ['a']), []);
 });
+
+test('networkMoments tolerates a non-array moments', () => {
+  assert.deepEqual(networkMoments({ moments: 'x' }, []), []);
+});
+
+test('handover lists only ramps that saved time, totals the printed values', () => {
+  const md = handover({ preview: { id: 'p' }, locales: ['en'], ramps: [{ scene: 'a', saved: 0.04 }, { scene: 'b', saved: 1.26 }, { scene: 'c', saved: 1.26 }], results: [] });
+  assert.doesNotMatch(md, /- a:/); assert.match(md, /total: 2\.6s/);
+  assert.match(handover({ preview: { id: 'p' }, locales: [], ramps: [{ scene: 'a', saved: 0 }], results: [] }), /Nothing was ramped/);
+});
