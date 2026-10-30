@@ -17,14 +17,14 @@ test('reactionFrame finds the change inside the window, null outside', () => {
 });
 test('alignCommands: offset from sync, tap time = frame before reaction', () => {
   const cmds = [{ seq: 0, kind: 'open', startMs: 10_000, durMs: 300, step: 0 },
-                { seq: 1, kind: 'tap', startMs: 11_800, durMs: 500, step: 1 },
-                { seq: 2, kind: 'tap', startMs: 14_100, durMs: 400, step: 2 },
-                { seq: 3, kind: 'tap', startMs: 16_000, durMs: 200, step: 3 }];   // no reaction anywhere near
+                { seq: 1, kind: 'tap', startMs: 11_900, durMs: 500, step: 1 },
+                { seq: 2, kind: 'tap', startMs: 14_200, durMs: 400, step: 2 },
+                { seq: 3, kind: 'tap', startMs: 16_100, durMs: 200, step: 3 }];   // no reaction anywhere near
   const { offsetMs, events } = alignCommands(cmds, diffs, 30);
-  assert.equal(offsetMs, 10_000 - 400);                    // frame 12 = 0.4 s
+  assert.equal(offsetMs, 10_300 - 400);                    // sync command END = frame 12 = 0.4 s
   assert.deepEqual(events.slice(1, 3).map((e) => [+(e.t * 30).toFixed(3), e.align]), [[69, 'frame'], [139, 'frame']]);
   assert.equal(events[3].align, 'window');
-  assert.equal(events[3].t, (16_000 + 200 - offsetMs) / 1000);
+  assert.equal(events[3].t, (16_100 + 200 - offsetMs) / 1000);
   assert.deepEqual([events[0].t, events[0].align], [0.4, 'frame']);
 });
 test('alignCommands: overlapping windows do not claim the same reaction or the sync frame', () => {

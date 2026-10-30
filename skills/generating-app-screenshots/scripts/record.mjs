@@ -62,6 +62,9 @@ export function writeTake(dir, id, files) {
   for (const [tmp, to] of staged) fs.renameSync(tmp, to);
 }
 
+// The take's Maestro commands: every step, waits included, so pacing matches the script.
+export const takeCommands = (resolved) => resolved.flatMap((s) => stepCommands(s, s.point));
+
 export const deviceClass = (width, height) => (Math.max(width, height) / Math.min(width, height) > 1.9 ? 'iphone' : 'ipad');
 
 const pctPair = (s) => { const m = /^\s*([\d.]+)%\s*,\s*([\d.]+)%\s*$/.exec(s || ''); return m ? [+m[1] / 100, +m[2] / 100] : null; };
@@ -88,7 +91,7 @@ export function buildSidecar({ fps, width, height, device, locale, offsetMs, eve
       out.push({ ...base, kind: 'type', text: s.type ?? '', step: e.step, align: e.align });
     }
   }
-  return { version: 1, fps, width, height, device, locale, syncOffset: r3(offsetMs / 1000), events: out, marks, takes };
+  return { version: 1, fps, width, height, device, class: deviceClass(width, height), locale, syncOffset: r3(offsetMs / 1000), events: out, marks, takes };
 }
 
 // ---- CLI -----------------------------------------------------------------------------------------------------
@@ -126,7 +129,7 @@ function maestroTest(udid, yamlFile, extra = []) {
 }
 
 function rehearse(udid, record, tmp) {
-  const resolved = [];   // the action steps with a resolved point
+  const resolved = [];   // every step (waits included), with its resolved point
   simctl('terminate', udid, record.app);   // same starting point as a take: an app left deep in a flow would resolve different elements
   record.steps.forEach((step, i) => {
     const n = i + 1;
@@ -147,7 +150,7 @@ function rehearse(udid, record, tmp) {
     fs.writeFileSync(file, flowYaml(record.app, stepCommands(step, point)));
     const r = maestroTest(udid, file);
     if (r.status !== 0) fail(`step ${n} failed in rehearsal: ${tail(r)}`);
-    if (isAction(step)) resolved.push({ ...step, point, box });
+    resolved.push({ ...step, point, box });
   });
   return resolved;
 }
@@ -170,7 +173,7 @@ async function recordOnce({ udid, record, resolved, tmp, ffmpeg, device, locale,
   }).catch((e) => { rec.kill('SIGINT'); throw e; });
 
   const flow = path.join(dir, 'take.yaml');
-  fs.writeFileSync(flow, flowYaml(record.app, resolved.flatMap((s) => stepCommands(s, s.point))));
+  fs.writeFileSync(flow, flowYaml(record.app, takeCommands(resolved)));
   const dbg = path.join(dir, 'dbg');
   const m = maestroTest(udid, flow, ['--debug-output', dbg, '--flatten-debug-output']);
   rec.kill('SIGINT');                 // never SIGKILL: the file is finalised on SIGINT
@@ -178,15 +181,25 @@ async function recordOnce({ udid, record, resolved, tmp, ffmpeg, device, locale,
 
   const result = { ok: m.status === 0, log: tail(m, 6), raw, dir };
   if (!result.ok) return result;
-  const info = probeClip(ffmpeg, raw);
-  const clip = extractClip(ffmpeg, { file: raw, height: 480, dir: path.join(dir, 'frames') });
-  const diffs = await frameDiffs(clip.files);
-  const cmds = readCommands(dbg).filter((c) => c.kind !== 'wait');   // waits end WARNED, without a duration
-  const { offsetMs, events } = alignCommands(cmds, diffs, clip.fps);
-  const taps = events.filter((e) => e.kind === 'tap');
-  Object.assign(result, { info, clip, events, offsetMs, diffs, taps, windowTaps: taps.filter((e) => e.align === 'window') });
-  result.sidecar = buildSidecar({ fps: clip.fps, width: info.width, height: info.height, device: device.name, locale, offsetMs: offsetMs - recStartMs, events, steps: resolved, takes: takeNo });
-  return result;
+  return processTake({ ffmpeg, raw, dbg, dir, resolved, device, locale, takeNo, recStartMs, result });
+}
+
+// Everything after Maestro: a take whose video, timeline or sync cannot be read is a failed take (the caller retries),
+// not a crash.
+export async function processTake({ ffmpeg, raw, dbg, dir, resolved, device, locale, takeNo, recStartMs = 0, result = {} }) {
+  try {
+    const info = probeClip(ffmpeg, raw);
+    const clip = extractClip(ffmpeg, { file: raw, height: 480, dir: path.join(dir, 'frames') });
+    const diffs = await frameDiffs(clip.files);
+    const cmds = readCommands(dbg).filter((c) => c.kind !== 'wait');   // waits end WARNED, without a duration
+    const { offsetMs, events } = alignCommands(cmds, diffs, clip.fps);
+    const taps = events.filter((e) => e.kind === 'tap');
+    return { ...result, ok: true, raw, dir, info, clip, events, offsetMs, diffs, taps, windowTaps: taps.filter((e) => e.align === 'window'),
+      sidecar: buildSidecar({ fps: clip.fps, width: info.width, height: info.height, device: device.name, locale, offsetMs: offsetMs - recStartMs,
+        events, steps: resolved.filter(isAction), takes: takeNo }) };
+  } catch (e) {
+    return { ...result, ok: false, raw, dir, log: `could not process the take: ${e.message}` };
+  }
 }
 
 async function writeBest(best, { outDir, id, tmp, takesRun }) {
