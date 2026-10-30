@@ -13,7 +13,7 @@ import { chromium } from 'playwright-core';
 import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
 import { renderDevice, screenRect, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
-import { buildLayout, canvasClass } from './layouts.mjs';
+import { buildLayout, canvasClass, screenAspectError } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
@@ -441,6 +441,11 @@ function slideElements(slide, target, locale, W, H, baseTheme = theme) {
     return { s: { ...s, background: '#000' }, th, els: [{ type: 'device', id: 'screen', model: 'none', style: 'frameless', screenModel: target.model, screen: s.screen,
       x: 50, y: 0, w: 100, radius: 0, screenAspect: H / W, shadow: false, fit: 'cover' }] };
   }
+  if (s.layout === 'end-card') {
+    if (cfg.app?.icon) s.appIcon = cfg.app.icon;
+    else notes.push(`end-card "${s.id}": no app.icon in the config — showing the name only`);
+    s.appName = cfg.app?.name;
+  }
   const base = buildLayout(s, { W, H, theme: th, target, modelFor: (screen, landscape) => autoModel({ screen, landscape }, target, locale),
     aspectFor: (screen, model, landscape) => { const src = screen && resolveScreen(screen, locale, model, landscape); return (src && imageMeta.get(src)?.aspect) || undefined; } });
   const extra = (s.elements || []).map((e) => specialize(e, target, locale));
@@ -544,6 +549,10 @@ async function resolvePreviews({ ffmpeg }) {
         await loadImageMeta([scene.screen, scene.screen2, scene.screen3, ...(scene.elements || []).map((e) => e.screen)], locale);
         const { s, th, els } = slideElements({ ...scene, labels: timed.length ? undefined : scene.labels }, target, locale, W, H, base);
         const dev = els.find((e) => e.type === 'device' && e.id === 'device');
+        // full-screen / caption-band: judge the recording (or still) against the canvas
+        const shownMeta = imageMeta.get(scene.screen);
+        const aspectMsg = shownMeta && screenAspectError(s.layout, shownMeta.w, shownMeta.h, W, H);
+        if (aspectMsg) { if (s.layout === 'full-screen') throw new Error(aspectMsg); warnSet.add(aspectMsg); }
         let clip = null, overflow = 0;
         if (info && dev) {
           const dur = Number.isFinite(scene.duration) ? scene.duration : DEFAULT_DURATION;
