@@ -20,6 +20,7 @@ import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kineti
 import { frameDiffs } from './align.mjs';
 import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from './ramp.mjs';
 import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, resolveTap } from './taps.mjs';
+import { handover, forPreview, networkMoments } from './report.mjs';
 import { storeChecks, iphoneOnly, isStillImagePath } from './storecheck.mjs';
 import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
@@ -539,7 +540,7 @@ async function resolvePreviews({ ffmpeg }) {
     try { list = selectScenes(p0.scenes, preview.scenes); } catch (e) { errors.push(`[${tag}] ${e.message}`); continue; }
     const { preset, ...pt } = preview.theme || {};
     const base = preview.theme ? layer(layer(theme, presetTheme(preset)), pt) : theme;
-    const scenes = [], checkScenes = [], drafts = [];
+    const scenes = [], checkScenes = [], drafts = [], ramps = [];
     // --scenes: a preview without any of the named scenes is skipped, not an error
     const pick = list.filter((x) => slideOn(x, target) && (!SCENE_FILTER || SCENE_FILTER.includes(x?.id)));
     if (SCENE_FILTER && !pick.length) continue;
@@ -624,6 +625,7 @@ async function resolvePreviews({ ffmpeg }) {
           dev.clipFrames = ex.files.map(fileUrl);
           imageMeta.set(ex.files[0], imageMeta.get(info.file));
           clip = { frames: map.length, fps: ex.fps, map };
+          if (auto) ramps.push({ scene: scene.id, saved: Math.max(0, (ex.count - map.length) / ex.fps) });   // fixed speeds are the author's choice
           // tap effects, in scene time: where the tap lands in the output after the ramp
           if (sidecar && tapStyle) {
             const accent = th.accent || '#ffcf5c';
@@ -679,7 +681,7 @@ async function resolvePreviews({ ffmpeg }) {
       for (const n of r.notes) notes.push(`[${tag}] ${n}`);
     }
     if (drafts.length) notes.push(`[${tag}] draft stills stand in for missing recordings (${drafts.join(', ')}) — record the app for the final preview`);
-    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet });
+    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet, ramps, drafts, moments: scenes.map((e) => e.scene.moment).filter(Boolean) });
   }
   return jobs;
 }
@@ -1306,6 +1308,25 @@ img.strip{border-radius:10px;margin-bottom:6px}.cap{margin:10px 0 8px;font-size:
 figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px}figcaption span{color:#777;font-family:ui-monospace,monospace}
 @media (prefers-color-scheme:dark){body{background:#111214;color:#eee}figcaption span,h2 small,p{color:#999}}</style>
 <h1>${esc(cfg.app?.name || 'Screenshots')}</h1><p>${manifest.length} files${previews.length ? ` · ${previews.length} previews` : ''} · click any image for full resolution</p>${sections.join('')}`);
+  }
+
+  // hand-over report per preview (not under --check: nothing was rendered)
+  if (!CHECK && shipped.length) {
+    const rdir = path.join(OUT, '_preview');
+    fs.mkdirSync(rdir, { recursive: true });
+    for (const id of [...new Set(shipped.map((p) => p.job.preview.id))]) {
+      const mine = shipped.filter((p) => p.job.preview.id === id), first = mine[0].job;
+      const pw = forPreview(warnings, id), pn = forPreview(notes, id);
+      const results = mine.map((p) => ({ tag: p.tag, file: path.relative(process.cwd(), p.file), length: p.job.timeline.total, posterTime: p.posterTime,
+        warnings: new Set(pw.filter((w) => w.startsWith(`[${p.tag}`))).size }));
+      const beats = first.timeline.scenes.map((s) => ({ id: s.id, start: s.start, end: s.end }));
+      const md = handover({ preview: first.preview, concept: first.preview.concept, results, beats, ramps: first.ramps, warnings: [...new Set(pw)], notes: [...new Set(pn)],
+        locales: LOCALES, moments: networkMoments(previewBrief, [...new Set(mine.flatMap((p) => p.job.moments))]), drafts: [...new Set(mine.flatMap((p) => p.job.drafts))] });
+      const rf = path.join(rdir, `${id}.report.md`);
+      fs.writeFileSync(rf, md);
+      const saved = first.ramps.reduce((a, r) => a + r.saved, 0), nw = results.reduce((a, r) => a + r.warnings, 0);
+      console.log(`  report ${path.relative(OUT, rf)}: ${results.length} files, ${nw ? `${nw} WARN` : 'clean'}${saved ? `, ${saved.toFixed(1)}s cut` : ''}`);
+    }
   }
 
   // previews: JSON-safe fields only (target.video can hold Infinity)
