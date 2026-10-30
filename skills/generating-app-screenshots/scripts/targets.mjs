@@ -27,6 +27,28 @@ export const TARGETS = {
   'watch-s4':       { w: 368, h: 448, store: 'ios', family: 'watch', model: 'apple-watch', raw: true, max: 10, label: 'Apple Watch Series 4–6, SE' },
   'watch-s3':       { w: 312, h: 390, store: 'ios', family: 'watch', model: 'apple-watch', raw: true, max: 10, label: 'Apple Watch Series 1–3' },
 
+  // ---- Apple App Store app previews (H.264/HEVC .mp4/.mov/.m4v, 15–30 s, <= 30 fps, <= 500 MB, max 3 per size & locale) ----
+  // Source: https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications (values copied 2026-10-30)
+  'preview-iphone':   { w: 886, h: 1920, store: 'ios', model: 'iphone', max: 3, asc: 'IPHONE_67', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPhone app preview (6.9/6.5/6.3/6.1/5.8", Duo)' },
+  'preview-iphone-16-9': { w: 1080, h: 1920, store: 'ios', model: 'iphone-home', max: 3, asc: 'IPHONE_55', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPhone app preview 5.5" / 4" (Home button)' },
+  'preview-iphone-4.7': { w: 750, h: 1334, store: 'ios', model: 'iphone-home', max: 3, asc: 'IPHONE_47', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPhone app preview 4.7"' },
+  'preview-ipad':     { w: 1200, h: 1600, store: 'ios', model: 'ipad', max: 3, asc: 'IPAD_PRO_3GEN_129', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPad app preview 13" / 12.9" / 11" / 10.5"' },
+  'preview-ipad-9.7': { w: 900, h: 1200, store: 'ios', model: 'ipad', max: 3, asc: 'IPAD_97', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'iPad app preview 9.7"' },
+  'preview-mac':      { w: 1920, h: 1080, store: 'ios', family: 'desktop', model: 'macbook', max: 3, asc: 'DESKTOP', video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Mac app preview 1920×1080', landscape: true },
+
+  // ---- Apple creative assets: product page header, search results, In-App Events (video 5–30 s / 15–30 s, image <= 500 MB) ----
+  // Source: https://developer.apple.com/help/app-store-connect/reference/app-information/creative-assets-specifications (values copied 2026-10-30)
+  'header-video':       { w: 3840, h: 1646, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Product page header video 21:9', landscape: true },
+  'search-video':       { w: 3840, h: 2560, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 5, maxSec: 30, fps: 30, maxMB: 500 }, label: 'Search results video 3:2', landscape: true },
+  'event-card-video':   { w: 3840, h: 2160, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event card video 16:9', landscape: true },
+  'event-details-video': { w: 2160, h: 3840, store: 'ios', family: 'creative', model: 'iphone', max: 3, video: { minSec: 15, maxSec: 30, fps: 30, maxMB: 500 }, label: 'In-App Event details video 9:16' },
+  'app-header':         { w: 3840, h: 1646, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'Product page header 21:9', landscape: true },
+  'app-header-16-9':    { w: 5244, h: 2950, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, formats: ['png'], label: 'Product page header 16:9 (PNG only)', landscape: true },
+  'search-asset':       { w: 3840, h: 2560, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'Search results asset 3:2', landscape: true },
+  'search-asset-16-9':  { w: 5244, h: 2950, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, formats: ['png'], label: 'Search results asset 16:9 (PNG only)', landscape: true },
+  'event-card':         { w: 3840, h: 2160, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'In-App Event card 16:9', landscape: true },
+  'event-details':      { w: 2160, h: 3840, store: 'ios', family: 'creative', model: 'iphone', max: 1, maxMB: 500, label: 'In-App Event details 9:16' },
+
   // ---- Google Play (JPEG or 24-bit PNG, no alpha; 320–3840px, long side <= 2x short side) ----
   'android-phone':    { w: 1080, h: 1920, store: 'play', model: 'android', max: 8, min: 2, playDir: 'phoneScreenshots', label: 'Play phone 9:16' },
   'android-phone-hd': { w: 1440, h: 2560, store: 'play', model: 'android', max: 8, min: 2, playDir: 'phoneScreenshots', label: 'Play phone 9:16 HD' },
@@ -48,17 +70,21 @@ export const TARGETS = {
   'product-hunt':  { w: 1270, h: 760, store: 'social', model: 'iphone', max: 99, label: 'Product Hunt gallery' },
   'instagram':     { w: 1080, h: 1350, store: 'social', model: 'iphone', max: 99, label: 'Instagram portrait 4:5' },
   'story':         { w: 1080, h: 1920, store: 'social', model: 'iphone', max: 99, label: 'Story / Reel 9:16' },
+  'story-video':   { w: 1080, h: 1920, store: 'social', model: 'iphone', max: 99, video: { minSec: 0, maxSec: Infinity, fps: 30, maxMB: Infinity }, label: 'Story / Reel video 9:16 (no store limits)' },
 };
 
 export function resolveTarget(spec) {
   if (typeof spec === 'object') {
     // custom: { "id": "promo", "w": 1200, "h": 628, "model": "iphone" }
-    return { store: 'custom', model: 'iphone', max: 99, ...spec, id: spec.id || `${spec.w}x${spec.h}` };
+    const out = { store: 'custom', model: 'iphone', max: 99, ...spec, id: spec.id || `${spec.w}x${spec.h}` };
+    if (out.video) out.video = { fps: 30, maxMB: 500, ...out.video };
+    return out;
   }
   const [id, mod] = spec.split('@');
   const t = TARGETS[id];
   if (!t) throw new Error(`Unknown target "${spec}". Known: ${Object.keys(TARGETS).join(', ')}`);
   const out = { ...t, id: spec, baseId: id };
+  if (t.video) out.video = { ...t.video };
   if (mod === 'landscape' && out.h > out.w) [out.w, out.h] = [out.h, out.w];
   // Apple accepts captioned watch shots at the store size (it rounds the corners itself); Wear OS rejects them
   if (mod === 'styled') {
@@ -67,6 +93,15 @@ export function resolveTarget(spec) {
   }
   out.landscape = out.w > out.h;
   return out;
+}
+
+export const isVideoTarget = (t) => !!t.video;
+
+// Apple takes some creative assets as PNG only. Returns an error message, or null when the format is fine.
+export function checkTargetFormat(t, format) {
+  if (!t.formats) return null;
+  const f = String(format).toLowerCase().replace(/^jpg$/, 'jpeg');
+  return t.formats.includes(f) ? null : `${t.id}: Apple accepts ${t.formats.join('/').toUpperCase()} only — use --format ${t.formats[0]}`;
 }
 
 // Locale codes differ between App Store Connect and Play Console. Keys are the codes you
