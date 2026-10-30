@@ -140,8 +140,8 @@ export function renderDevice(el, ctx) {
   // --- screen ---
   const content = el.src
     ? el.landscape
-      ? `<img src="${el.src}" style="position:absolute;left:50%;top:50%;width:${px(g.screenH)};height:${px(g.screenW)};object-fit:${el.fit || 'cover'};object-position:top;transform:translate(-50%,-50%) rotate(90deg)">`
-      : `<img src="${el.src}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:${el.fit || 'cover'};object-position:top">`
+      ? `<img class="scr" src="${el.src}" style="position:absolute;left:50%;top:50%;width:${px(g.screenH)};height:${px(g.screenW)};object-fit:${el.fit || 'cover'};object-position:top;transform:translate(-50%,-50%) rotate(90deg)">`
+      : `<img class="scr" src="${el.src}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:${el.fit || 'cover'};object-position:top">`
     : `<div style="position:absolute;inset:0;background:${el.screenColor || '#111'}"></div>`;
   let cutout = '';
   if (!g.frameless && el.cutout !== false) {
@@ -197,7 +197,7 @@ export function renderDevice(el, ctx) {
   const cx = el.landscape ? visW / 2 : g.pad.l + g.bodyW / 2, cy = el.landscape ? visH / 2 : g.pad.t + g.bodyH / 2;
   const decor = style === 'frameless' ? { back: '', front: '' } : extras(g, el, frame, style);
   const inner = `${decor.back}<div style="position:absolute;left:${px(cx)};top:${px(cy)};width:${px(g.bodyW)};height:${px(g.bodyH)};transform:translate(-50%,-50%)${el.landscape ? ' rotate(-90deg)' : ''};border-radius:${px(g.frameless ? SR : R)};box-shadow:${[edge, shadowCss].filter((s) => s && s !== 'none').join(',') || 'none'}">${buttons}${body}${bezelDot}${screen}</div>${decor.front}`;
-  return `<div class="el device" style="position:absolute;left:${px(left)};top:${px(top)};width:${px(visW)};height:${px(visH)};transform:${transform.trim() || 'none'};z-index:${el.z ?? 2};opacity:${el.opacity ?? 1}${el.dim ? `;filter:brightness(${1 - el.dim})` : ''}">${inner}</div>`;
+  return `<div class="el device" data-el="${String(el.id || 'device').replace(/[&<>"]/g, '')}" style="position:absolute;left:${px(left)};top:${px(top)};width:${px(visW)};height:${px(visH)};transform:${transform.trim() || 'none'};z-index:${el.z ?? 2};opacity:${el.opacity ?? 1}${el.dim ? `;filter:brightness(${1 - el.dim})` : ''}">${inner}</div>`;
 }
 
 // window title bars: macOS (traffic lights), Windows 11 (caption buttons), browser (address bar)

@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip } from '../scripts/video.mjs';
+import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning } from '../scripts/video.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'asp-video-'));
@@ -215,4 +215,31 @@ test('filmstrip tiles one frame per second', async () => {
     const tw = 120; // 100x200 source scaled to 240 high
     assert.deepEqual([r.w, r.h], [8 + 10 * (tw + 8), 8 + 3 * (240 + 28 + 8)]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('selectScenes: an array of ids picks base scenes in that order; unknown ids throw naming them', () => {
+  const base = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  assert.deepEqual(selectScenes(base.slice(0, 2), ['b']), [{ id: 'b' }]);
+  assert.deepEqual(selectScenes(base, ['c', 'a']).map((s) => s.id), ['c', 'a']);
+  assert.throws(() => selectScenes(base, ['b', 'nope']), /"nope"/);
+});
+test('selectScenes: no override or scene objects keep their scenes', () => {
+  const base = [{ id: 'a' }];
+  assert.equal(selectScenes(base, undefined), base);
+  const own = [{ id: 'x', title: 'X' }];
+  assert.equal(selectScenes(base, own), own);
+});
+test('missingClipWarning: silent for the own locale, its language, or a declared clipLocale', () => {
+  assert.equal(missingClipWarning('de-DE', 'de-DE'), null);
+  assert.equal(missingClipWarning('de-DE', 'de'), null);                 // language-level recording is the locale's own
+  assert.equal(missingClipWarning('ja', 'en-US', 'en-US'), null);        // declared: recordings are English
+  assert.equal(missingClipWarning('de-DE', 'en-US', 'de'), null);        // clipLocale = the locale's language
+  assert.equal(missingClipWarning('de-DE', 'en-US', 'de-DE'), null);
+  assert.equal(missingClipWarning('ja', 'en-US'), '[ja] no recording for this locale — using en-US; UI language in the recording does not match');
+  assert.match(missingClipWarning('ja', 'en-US', 'fr'), /^\[ja\] no recording/);
+});
+test('missingClipWarning in a per-job Set warns once per locale however many scenes fall back', () => {
+  const seen = new Set();
+  for (const scene of ['a', 'b', 'c']) { const w = missingClipWarning('vi', 'en-US'); if (w) seen.add(w); void scene; }
+  assert.equal(seen.size, 1);
 });
