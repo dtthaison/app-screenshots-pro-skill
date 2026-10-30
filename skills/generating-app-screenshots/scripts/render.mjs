@@ -681,7 +681,8 @@ async function resolvePreviews({ ffmpeg }) {
       for (const n of r.notes) notes.push(`[${tag}] ${n}`);
     }
     if (drafts.length) notes.push(`[${tag}] draft stills stand in for missing recordings (${drafts.join(', ')}) — record the app for the final preview`);
-    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet, ramps, drafts, moments: scenes.map((e) => e.scene.moment).filter(Boolean)   // optional scene field: a preview-brief.json moment id });
+    // moment: optional scene field naming a preview-brief.json moment id
+    jobs.push({ preview, target, locale, W, H, scenes, timeline, warnings: warnSet, ramps, drafts, moments: scenes.map((e) => e.scene.moment).filter(Boolean) });
   }
   return jobs;
 }
@@ -1207,7 +1208,7 @@ async function main() {
     const { target: t, locale, preview } = p.job;
     if (fs.statSync(p.file).size > t.video.maxMB * 1024 * 1024) { errors.push(`${p.file}: larger than ${t.video.maxMB} MB`); p.failed = true; }
     if (preview.music && t.baseId === 'search-video') warn(`[${p.tag}] search results videos cannot be unmuted — music is wasted bytes`);
-    if (p.stills && t.family === 'creative') notes.push(`[${t.id}/${locale}/${preview.id}] ${t.id}/${locale}/${preview.id}.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`);
+    if (p.stills && t.family === 'creative') notes.push(`[${t.id}/${locale}/${preview.id}] ${preview.id}.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`);
     else if (p.stills && t.asc) notes.push(`[${p.tag}] every scene is a still — fine for a draft; record the app for the final preview`);
     for (const w of p.posterWarnings) warn(`[${p.tag}] ${w}`);
     (pvKey[`${t.id}|${locale}`] ||= []).push(p);
