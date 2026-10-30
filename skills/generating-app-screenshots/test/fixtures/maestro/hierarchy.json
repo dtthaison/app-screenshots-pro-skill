@@ -1,0 +1,164 @@
+{
+ "attributes": {
+  "accessibilityText": "",
+  "text": "",
+  "resource-id": "",
+  "bounds": "[0,0][0,0]"
+ },
+ "children": [
+  {
+   "attributes": {
+    "accessibilityText": " ",
+    "text": "",
+    "resource-id": "",
+    "bounds": "[0,0][402,874]"
+   },
+   "children": [
+    {
+     "attributes": {
+      "accessibilityText": "",
+      "text": "",
+      "resource-id": "",
+      "bounds": "[0,0][402,874]"
+     },
+     "children": [
+      {
+       "attributes": {
+        "accessibilityText": "",
+        "text": "",
+        "resource-id": "",
+        "bounds": "[0,0][402,874]"
+       },
+       "children": [
+        {
+         "attributes": {
+          "accessibilityText": "",
+          "text": "",
+          "resource-id": "Home screen icons",
+          "bounds": "[0,0][402,874]"
+         },
+         "children": [
+          {
+           "attributes": {
+            "accessibilityText": "",
+            "text": "",
+            "resource-id": "",
+            "bounds": "[0,0][402,874]"
+           },
+           "children": [
+            {
+             "attributes": {
+              "accessibilityText": "",
+              "text": "",
+              "resource-id": "",
+              "bounds": "[0,0][402,874]"
+             },
+             "children": [
+              {
+               "attributes": {
+                "accessibilityText": "",
+                "text": "",
+                "resource-id": "",
+                "bounds": "[0,0][0,0]"
+               },
+               "children": [
+                {
+                 "attributes": {
+                  "accessibilityText": "Fitness",
+                  "text": "",
+                  "resource-id": "Fitness",
+                  "bounds": "[28,88][96,178]"
+                 },
+                 "children": [],
+                 "enabled": true,
+                 "focused": false,
+                 "checked": false,
+                 "selected": false
+                },
+                {
+                 "attributes": {
+                  "accessibilityText": "Files",
+                  "text": "",
+                  "resource-id": "Files",
+                  "bounds": "[306,88][374,178]"
+                 },
+                 "children": [],
+                 "enabled": true,
+                 "focused": false,
+                 "checked": false,
+                 "selected": false
+                },
+                {
+                 "attributes": {
+                  "accessibilityText": "Utilities folder",
+                  "text": "2 apps",
+                  "resource-id": "Utilities",
+                  "bounds": "[120,188][188,279]"
+                 },
+                 "children": [],
+                 "enabled": true,
+                 "focused": false,
+                 "checked": false,
+                 "selected": false
+                },
+                {
+                 "attributes": {
+                  "accessibilityText": "Lingeva",
+                  "text": "",
+                  "resource-id": "Lingeva",
+                  "bounds": "[213,188][281,279]"
+                 },
+                 "children": [],
+                 "enabled": true,
+                 "focused": false,
+                 "checked": false,
+                 "selected": false
+                }
+               ],
+               "enabled": true,
+               "focused": false,
+               "checked": false,
+               "selected": false
+              }
+             ],
+             "enabled": true,
+             "focused": false,
+             "checked": false,
+             "selected": false
+            }
+           ],
+           "enabled": true,
+           "focused": false,
+           "checked": false,
+           "selected": false
+          }
+         ],
+         "enabled": true,
+         "focused": false,
+         "checked": false,
+         "selected": false
+        }
+       ],
+       "enabled": true,
+       "focused": false,
+       "checked": false,
+       "selected": false
+      }
+     ],
+     "enabled": true,
+     "focused": false,
+     "checked": false,
+     "selected": false
+    }
+   ],
+   "enabled": true,
+   "focused": false,
+   "checked": false,
+   "selected": false
+  }
+ ],
+ "enabled": false,
+ "focused": false,
+ "checked": false,
+ "selected": false
+}
