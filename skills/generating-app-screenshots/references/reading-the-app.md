@@ -109,7 +109,7 @@ Rules for a good take:
 
 ### Fallback: record by hand
 
-When Maestro or a simulator is not available (a physical device, an Android emulator, a web app), record by hand and point scenes at the file. Without a sidecar, `tap` effects are skipped (with a NOTE), `speed: "auto"` still works because it needs only frames, and `clip.from`/`to` marks are an ERROR (use `clip.start`/`end`). A hand-written `.taps.json` next to the recording restores marks and tap effects (`examples/preview/recordings/en-US/walk.taps.json`).
+When Maestro or a simulator is not available (a physical device, an Android emulator, a web app), record by hand and point scenes at the file. Without a sidecar, `tap` effects are skipped (with a NOTE only when `tap` is set explicitly; the default is silent), `speed: "auto"` still works because it needs only frames, and `clip.from`/`to` marks are an ERROR (use `clip.start`/`end`). A hand-written `.taps.json` next to the recording restores marks and tap effects (`examples/preview/recordings/en-US/walk.taps.json`).
 
 **iOS Simulator** (set the status bar override from §2 first)
 ```bash
