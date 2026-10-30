@@ -480,6 +480,7 @@ window.__fit = async (scope) => {
   await document.fonts.ready;
   await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
   const root = scope ? document.querySelector(scope) : document;
+  if (!root) return [];
   const report = [];
   for (const box of root.querySelectorAll('[data-fit]')) {
     const inner = box.querySelector('.fit-inner'); const maxH = +box.dataset.maxh;

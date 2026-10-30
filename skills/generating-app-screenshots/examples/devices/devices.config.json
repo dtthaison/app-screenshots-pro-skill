@@ -363,11 +363,7 @@
       "screen": "../gallery/screens/home.html",
       "skipTargets": [
         "event-details"
-      ],
-      "caption": {
-        "x": 31,
-        "w": 40
-      }
+      ]
     },
     {
       "id": "event",
