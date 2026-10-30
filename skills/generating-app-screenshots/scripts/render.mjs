@@ -698,7 +698,9 @@ async function renderPreviews(browser, jobs, ffmpeg) {
     fs.writeFileSync(html, previewPage(job));
     const page = await pageFor(scale);
     await page.setViewportSize({ width: W, height: H });
-    await page.goto(pathToFileURL(html).href, { waitUntil: 'networkidle', timeout: 60000 }).catch((e) => warn(`load: ${e.message}`));
+    // a page that did not load would encode a blank video
+    const failedLoad = await page.goto(pathToFileURL(html).href, { waitUntil: 'networkidle', timeout: 60000 }).then(() => null, (e) => e);
+    if (failedLoad) { errors.push(`[${tag}] page failed to load: ${failedLoad.message.split('\n')[0]}`); continue; }
     await fitScenes(page, job);
 
     const index = (counter[`${t.id}|${locale}`] = (counter[`${t.id}|${locale}`] || 0) + 1);
@@ -895,6 +897,7 @@ async function main() {
       } catch (e) { errors.push(e.message); }   // FFMPEG_PATH set but missing
     }
   }
+  if (ONLY_PREVIEWS && !VIDEO_TARGETS.length) warn('--only-previews: no video targets in this run (add preview-iphone, … to "targets")');
   if (errors.length) { for (const e of errors) console.log(`  ERROR ${e}`); process.exit(1); }
   fs.mkdirSync(path.join(OUT, '.build'), { recursive: true });
   const slides = (cfg.slides || []).filter((s) => !SLIDE_FILTER || SLIDE_FILTER.includes(s.id));
@@ -1083,7 +1086,7 @@ async function main() {
     // app previews first, as on the store: the video, its filmstrip and the poster time to set in App Store Connect
     for (const [k, arr] of Object.entries(pvKey)) {
       const t = arr[0].job.target, rel = (f) => esc(path.relative(OUT, f));
-      const vids = arr.map((p) => `<div class="pv"><video controls loop muted playsinline src="${rel(p.file)}"></video><div><b>${String(p.index).padStart(2, '0')} · ${esc(p.job.preview.id)}</b> <span class="cap">${p.job.timeline.total}s · poster at ${timeCode(p.posterTime).replace(/:(\d\d)$/, '.$1')}</span>${p.filmstrip ? `<a href="${rel(p.filmstrip)}" target="_blank"><img class="strip" src="${rel(p.filmstrip)}"></a>` : ''}</div></div>`).join('');
+      const vids = arr.map((p) => `<div class="pv"><video controls loop muted playsinline src="${rel(p.file)}"></video><div><b>${String(p.index).padStart(2, '0')} · ${esc(p.job.preview.id)}</b> <span class="cap">${p.job.timeline.total}s · poster at ${p.posterTime.toFixed(2)} s</span>${p.filmstrip ? `<a href="${rel(p.filmstrip)}" target="_blank"><img class="strip" src="${rel(p.filmstrip)}"></a>` : ''}</div></div>`).join('');
       sections.push(`<section><h2>Preview · ${esc(t.label || t.id)} <small>${esc(k.split('|')[1])} · ${t.w}×${t.h} · ${arr.length} videos</small></h2>${vids}</section>`);
     }
     for (const [k, arr] of Object.entries(byKey)) {

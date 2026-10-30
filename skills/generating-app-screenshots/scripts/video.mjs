@@ -220,13 +220,18 @@ export function extractClip(ffmpeg, { file, start = 0, end, speed = 1, height, d
   return { dir, files, count: files.length, fps: FPS };
 }
 
-// JPEG frames on stdin -> H.264 High 4.0 yuv420p + AAC (silent, or music trimmed to `total` with a fade-out).
+// JPEG frames on stdin -> H.264 High (level 4.0 up to 8192 macroblocks) yuv420p + AAC (silent, or music trimmed to `total` with a fade-out).
 export function encodeArgs({ fps, width, height, out, total, music, scaleTo }) {
   const a = ['-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-'];  // mjpeg: probing a pipe can miss the stream
   a.push(...(music ? ['-i', music.src] : ['-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000']));
   a.push('-map', '0:v', '-map', '1:a');
   if (scaleTo) a.push('-vf', `scale=${scaleTo.w}:${scaleTo.h}:flags=lanczos`);
-  a.push('-c:v', 'libx264', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', '-r', String(fps), '-b:v', '11M', '-maxrate', '12M', '-bufsize', '24M');
+  // Level 4.0 (Apple's app-preview spec) allows 8192 macroblocks per frame; bigger frames (the 4K creative targets) get
+  // no -level (libx264 picks one that fits) and a higher bitrate
+  const ow = scaleTo?.w ?? width, oh = scaleTo?.h ?? height;
+  const big = Math.ceil(ow / 16) * Math.ceil(oh / 16) > 8192;
+  a.push('-c:v', 'libx264', '-profile:v', 'high', ...(big ? [] : ['-level', '4.0']), '-pix_fmt', 'yuv420p', '-r', String(fps));
+  a.push(...(big ? ['-b:v', '20M', '-maxrate', '24M', '-bufsize', '48M'] : ['-b:v', '11M', '-maxrate', '12M', '-bufsize', '24M']));
   a.push('-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-ac', '2');
   if (music) {
     const f = [];

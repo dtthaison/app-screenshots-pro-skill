@@ -117,6 +117,15 @@ test('encodeArgs: H.264 High 4.0 yuv420p 30fps 11M, faststart, silent stereo AAC
   for (const s of ['-f image2pipe', '-framerate 30', 'anullsrc=channel_layout=stereo:sample_rate=48000', '-c:v libx264', '-profile:v high', '-level 4.0', '-pix_fmt yuv420p', '-b:v 11M', '-maxrate 12M', '-bufsize 24M', '-r 30', '-c:a aac', '-b:a 256k', '-ar 48000', '-ac 2', '-movflags +faststart', '-t 20', 'x.mp4']) assert.ok(a.includes(s), s);
   assert.ok(!a.includes('-vf') && !a.includes('afade'));
 });
+test('encodeArgs: level 4.0 and 11M up to 8192 macroblocks; above, no -level and 20M', () => {
+  const small = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 20 });
+  assert.equal(small[small.indexOf('-level') + 1], '4.0'); assert.equal(small[small.indexOf('-b:v') + 1], '11M');
+  const big = encodeArgs({ fps: 30, width: 3840, height: 1646, out: 'x.mp4', total: 20 });
+  assert.ok(!big.includes('-level'));
+  assert.deepEqual(['-b:v', '-maxrate', '-bufsize'].map((k) => big[big.indexOf(k) + 1]), ['20M', '24M', '48M']);
+  // the output size is scaleTo's when given (a 0.25x render of the 4K header still encodes at 4K)
+  assert.ok(!encodeArgs({ fps: 30, width: 960, height: 412, out: 'x.mp4', total: 5, scaleTo: { w: 3840, h: 1646 } }).includes('-level'));
+});
 test('encodeArgs with music trims to total and fades out', () => {
   const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 20, music: { src: 'm.mp3', volume: 0.8, fadeOut: 1.5 } }).join(' ');
   assert.ok(a.includes('-i m.mp3') && a.includes('volume=0.8') && a.includes('afade=t=out:st=18.5:d=1.5'));
