@@ -34,7 +34,8 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
     const kind = index === 0 ? 'cut' : Object.hasOwn(TRANSITIONS, want) ? want : 'crossfade';
     const start = cursor; cursor = ms(cursor + duration);
     if (s.in != null && !Object.hasOwn(ENTRANCES, s.in)) errors.push(`scene "${s.id}": unknown entrance "${s.in}"`);
-    const entrance = Object.hasOwn(ENTRANCES, s.in) ? s.in : 'rise';
+    // scene 1 starts complete by default (the video opens on it and loops back to it); later scenes rise in
+    const entrance = Object.hasOwn(ENTRANCES, s.in) ? s.in : index === 0 ? 'none' : 'rise';
     const clipOk = s.clip && s.clip.frames > 0 && s.clip.fps > 0;
     if (s.clip && !clipOk) errors.push(`scene "${s.id}": clip needs frames and fps`);
     const motion = clipOk ? 'none' : s.motion === 'scroll' && !(s.overflow >= SCROLL_MIN) ? 'drift' : s.motion ?? 'drift';
