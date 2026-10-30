@@ -15,7 +15,9 @@ A Claude Code skill that turns your app into App Store and Google Play screensho
 - **Draws the devices in CSS.** iPhone (Dynamic Island, notch, Home button), iPad, Android phone and tablet, Apple Watch, Wear OS, MacBook, iMac-style desktop, and Mac, Windows and browser windows. Styles are real, clay, outline or frameless, in any color, with 3D tilt. No mockup files to download.
 - **41 layouts and 15 panorama patterns.** These include hero, tilt, before/after, mosaic, feature grid and reviews, plus signature layouts (spotlight, big-type, ticker, arch, orbit, lens, layers, notify, deck) and connected panoramas whose phones span two slides.
 - **35 store sizes.** Every current App Store, Play, Mac App Store, Microsoft Store, Apple Watch and Wear OS size, plus social formats (OG image, X, Product Hunt, Instagram, Story).
-- **Checks the output against store rules.** Exact pixel sizes, no alpha channel, per-store screenshot count and file size limits. It also warns when text is clipped, covered by a device, shrunk below 90%, or about to fall in a panorama seam.
+- **App preview videos.** Scenes (stills, HTML mocks or screen recordings) with captions, labels, transitions and a looping fade become 15–30 s `.mp4` files for every App Store preview size and locale: H.264, 30 fps, a silent or music audio track, a poster frame and a filmstrip to review.
+- **Product page header, search results and In-App Event assets.** Images (21:9, 3:2, 16:9, 9:16) and videos at the exact sizes Apple lists, from the same config.
+- **Checks the output against store rules.** Exact pixel sizes, no alpha channel, per-store screenshot count and file size limits, and video duration, count and size. It also warns when text is clipped, covered by a device, shrunk below 90%, or about to fall in a panorama seam.
 - **Ready to upload.** `--fastlane` writes the folder layout that `fastlane deliver` and `supply` expect.
 
 | Signature layouts | Connected panorama |
@@ -50,6 +52,7 @@ ln -s "$PWD/app-screenshots-pro-skill/skills/generating-app-screenshots" ~/.clau
 - Node.js 18.17 or newer
 - Google Chrome or Microsoft Edge. If you have neither, run `npx playwright install chromium`, or set `CHROME_PATH`.
 - Internet access while rendering, for Google Fonts.
+- For previews: ffmpeg. `npm install` fetches it through the optional `ffmpeg-static` package (a GPL-3.0 binary downloaded at install time; this repo is MIT and does not redistribute it). Or set `FFMPEG_PATH`, or `brew install ffmpeg`. Lookup order: `FFMPEG_PATH`, `ffmpeg-static`, `ffmpeg` on `PATH`.
 
 Dependencies (`playwright-core`, `sharp`) install themselves the first time the skill runs. To install them by hand:
 
@@ -77,13 +80,15 @@ The skill takes it from there:
 ```bash
 node skills/generating-app-screenshots/scripts/render.mjs path/to/screenshots.config.json \
   [--locales en-US,vi] [--targets ios-6.9,android-phone] [--slides hero] \
-  [--format png|jpeg|webp] [--fastlane] [--no-preview]
+  [--format png|jpeg|webp] [--fastlane] [--no-preview] \
+  [--previews tour] [--scenes hero,stats] [--no-previews] [--only-previews] [--supersample 1]
 ```
 
 The renderer writes:
 - `out/<target>/<locale>/NN_<slide>.png`: the store images.
 - `out/_preview/*.jpg`: contact sheets. For panoramas there is also a store-card view.
 - `out/index.html`: a page that shows everything.
+- Previews: `out/<target>/<locale>/NN_<id>.mp4` and `NN_<id>.poster.png`, plus a filmstrip in `out/_preview/`. With `--fastlane`, `out/fastlane/app-previews/<locale>/NN_<IDENT>_<id>.mp4` is what `fastlane deliver` uploads; creative assets go to `out/fastlane/creative/` and are uploaded by hand in App Store Connect.
 
 A minimal config:
 
@@ -112,6 +117,7 @@ The full schema is in [`references/config.md`](skills/generating-app-screenshots
 | [`examples/signature`](skills/generating-app-screenshots/examples/signature) | The 9 signature layouts |
 | [`examples/panorama-patterns`](skills/generating-app-screenshots/examples/panorama-patterns) | All 15 panorama patterns |
 | [`examples/devices`](skills/generating-app-screenshots/examples/devices) | Watch, Wear OS, Mac, Windows and cross-device slides |
+| [`examples/preview`](skills/generating-app-screenshots/examples/preview) | An app preview with a synthetic recording, labels and a poster, plus the header, search and event assets (`npm run example:preview`; `example:preview-clip` for a scrolling recording) |
 
 Rebuild the showcase site (`docs/`) after rendering the examples with `npm run examples && npm run site`.
 
@@ -141,7 +147,12 @@ docs/                            GitHub Pages showcase (built by scripts/build-s
 
 - HTML mock screens are for drafts. Apple and Google want the real app UI, so replace mocks with simulator or device captures before you submit.
 - The device frames are drawn in CSS and only resemble real hardware. They are not Apple or Google artwork.
-- Rendering takes about 4 seconds per image.
+- Rendering takes about 4 seconds per image. A preview takes about 1–2 minutes per locale on a laptop, and a 4K creative video 3–5 minutes.
+- Chromium from `playwright install` works for previews: clips are extracted to frames, so H.264 decoding in the browser is not needed.
+- Landscape recordings are not supported inside device frames yet.
+- The preview pass treats a page-load timeout (for example Google Fonts offline) as an error.
+- A filtered run (`--targets`, `--previews`, `--scenes`, `--slides`) rewrites `manifest.json` and `index.html` with only that run's output.
+- Header and search videos are muted on the store; every preview carries a silent audio track unless you give it `music`, because App Store Connect rejects videos without one.
 
 ## Contributing
 

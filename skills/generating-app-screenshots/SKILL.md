@@ -1,13 +1,13 @@
 ---
 name: generating-app-screenshots
-description: Use when making App Store or Google Play screenshots, store listing images, marketing screenshots, a Play feature graphic, or social promo images for a mobile app — framed devices with captions, device colors, gradient or image backgrounds, panoramic sets, or translated/localized screenshot sets — especially when starting from an app's codebase (iOS, Android, Flutter, React Native, Expo, web) or from simulator/device captures. Alternative to screenshots.pro, AppScreens, Picasso, BrandBird.
+description: Use when making App Store or Google Play screenshots, store listing images, marketing screenshots, a Play feature graphic, app preview videos, product page header, search results and In-App Event assets, or social promo images for a mobile app — framed devices with captions, device colors, gradient or image backgrounds, panoramic sets, or translated/localized screenshot sets — especially when starting from an app's codebase (iOS, Android, Flutter, React Native, Expo, web) or from simulator/device captures. Alternative to screenshots.pro, AppScreens, Picasso, BrandBird.
 ---
 
 # Generating App Screenshots
 
-Code-driven App Store / Play screenshots: one JSON config → every store size × every locale, rendered by headless Chrome
+Code-driven App Store / Play screenshots and app preview videos: one JSON config → every store size × every locale, rendered by headless Chrome
 (`scripts/render.mjs`). Frames are drawn in CSS (real / clay / outline / frameless, any color, 3D tilt), so nothing needs
-downloading. Output is validated against store rules (exact size, no alpha, count limits).
+downloading. Output is validated against store rules (exact size, no alpha, count and duration limits). Videos are encoded with ffmpeg.
 
 **Core principle:** screenshots sell *benefits*, not screens. Read the app first, write captions from what users get, then render, look at every preview, and fix.
 
@@ -16,19 +16,21 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
 1. **Read the app** → name, value props, top 4–6 features, brand colors, fonts, supported locales, existing translations.
    Where to look per stack: [references/reading-the-app.md](references/reading-the-app.md).
 2. **Get raw screens**, best first: (a) real captures from simulator/emulator per locale (commands in reading-the-app.md);
-   (b) user-supplied PNGs; (c) HTML mock screens rebuilt from the app's UI code (`screens/*.html`, read `?locale=` to localize).
+   (b) user-supplied PNGs; (c) HTML mock screens rebuilt from the app's UI code (`screens/*.html`, read `?locale=` to localize);
+   (d) screen recordings for previews (reading-the-app.md §2b).
    Never invent features the app doesn't have.
 3. **Write copy + translations** → `copy.json`. Rules and locale codes: [references/copy-and-locales.md](references/copy-and-locales.md).
 4. **Write `screenshots.config.json`** — schema, layouts, elements: [references/config.md](references/config.md).
    Start from `examples/demo/screenshots.config.json` (normal set), `examples/demo/panorama.config.json` (connected set),
    or copy slides from `examples/gallery/layouts.config.json` — one slide for every layout × preset (open `examples/gallery/out/index.html` to see them).
    Pick a `theme.preset` that matches the brand, then vary `preset`/`layout` per slide for rhythm.
+   Add `previews` when the app ships a preview (start from `examples/preview/`). The preview shows **first** on the store, so scene 1 and the poster carry the hook.
 5. **Render:**
    ```bash
    cd <skill-dir> && [ -d node_modules ] || npm install --no-fund --no-audit
-   node <skill-dir>/scripts/render.mjs path/to/screenshots.config.json [--locales en-US,vi] [--targets ios-6.9] [--slides hero] [--fastlane]
+   node <skill-dir>/scripts/render.mjs path/to/screenshots.config.json [--locales en-US,vi] [--targets ios-6.9] [--slides hero] [--fastlane] [--previews tour] [--scenes hero,stats]
    ```
-   Iterate on one locale + one target, then run everything.
+   Iterate on one locale + one target, then run everything. Previews take about 1–2 minutes each per locale (3–5 for 4K creative videos): iterate with `--scenes`, `--only-previews`, `"renderScale": 0.5`.
 6. **QA — required.** Read every `out/_preview/<target>__<locale>.jpg` image (they're contact sheets; `out/index.html` shows them all).
    Re-render until every box is true:
    - [ ] exit code 0, no `ERROR` / `WARN` lines
@@ -37,8 +39,10 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
    - [ ] no missing glyphs: `#`, `?`, or empty boxes where icons or CJK/Thai/Arabic text should be
    - [ ] highlights land on the benefit words in every locale; RTL locales read right to left
    - [ ] UI strings inside screens are translated too, and correct (plurals, number/date formats)
+   - [ ] previews: read every `_preview/*__<id>.jpg` filmstrip; the poster frame is readable alone; nothing is still moving at the loop point; clips are not stretched; labels are timed right in every locale
 7. **Deliver:** report the output folder, the targets × locales rendered, and what still needs a human:
    native-speaker review; **if HTML mocks were used, say they must be replaced by real captures before App Store submission**;
+   for previews: the files, the poster time to set in App Store Connect (or the `preview_frame_time_code` the report prints), and a draft notice when scenes are stills or mocks;
    app bugs you noticed while reading the code (e.g. broken plurals), reported, not silently baked into the screenshots.
    `--fastlane` also writes `out/fastlane/` for `fastlane deliver` / `supply` upload (`out/.build/` is scratch; ignore it).
 
@@ -59,6 +63,9 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
 | Phone spanning 2 slides | top-level `"panorama"` + element `"seam": 2` (border of slides 2\|3), `"dx"` nudge, `"slide": n` for slide-relative x — see `examples/gallery/panorama.config.json` |
 | Ready-made panorama | `"panorama": { "pattern": ... }`: signature `wave-ride timeline giant-word constellation stage ticker` (no device cut), classic `flow peek cascade zigzag bridge crossing landscape-lay scatter giant` (safest first); slide 1 always stands alone; check `_preview/*__store.jpg` (cards with gaps) — see `examples/panorama-patterns/` |
 | Elements | `badge` `zoom` (magnified crop) `callout` `arrow` `card` `stars` `laurel` `shape` `image` `text` |
+| Preview videos | targets `preview-iphone` `preview-iphone-16-9` `preview-iphone-4.7` `preview-ipad` `preview-ipad-9.7` `preview-mac`: 15–30 s, max 3 per size and locale; `--fastlane` → `out/fastlane/app-previews/` |
+| Creative assets | images `app-header` `search-asset` `event-card` `event-details` (+ `-16-9`, png only), videos `header-video` `search-video` `event-card-video` `event-details-video`: 1 per locale; wide slides need `"targets": ["creative"]` |
+| `previews` | `[{ id, targets, music, poster, transition, loop, clipLocale, byTarget, scenes: [{ id, layout, title, screen (still, mock or clip), duration, clip, motion, labels, in, transition }] }]` — config.md → previews |
 | Mock screen states | `"screen": "screens/stats.html?state=before"` (query reaches the mock) |
 
 ## Common mistakes
@@ -71,3 +78,8 @@ downloading. Output is validated against store rules (exact size, no alpha, coun
 - **Captions or frames on watch store shots** → Wear OS rejects them, so `wear-os` renders the bare UI. Apple masks watch shots itself: `watch-*` is bare by default, and `watch-ultra@styled` adds background and a short caption. Framed watches belong in phone slides (`phone-watch`) or social images.
 - **Phone slides leaking into watch/Mac/Windows targets** → give each family its own slides with `"targets": ["watch"]` / `["desktop"]`, and `"skipTargets"` on the phone ones.
 - **Fonts missing a script** → the renderer adds Noto fonts for ja/ko/zh/ar/he/th/hi automatically; keep `font.weights` to weights the Google font has.
+- **Preview over 30 s** (or under 15) → the renderer errors with the sum; shorten scene `duration`s or pick scenes per target with `byTarget.<target>.scenes`.
+- **Fast cuts** → give each screen about 3–5 s; viewers must read the caption.
+- **Stills-only preview submitted as final** → Apple wants the main flow recorded (§2b); the renderer's "draft" NOTE means exactly this.
+- **Clip in the wrong language** → one recording per locale, or `clipLocale` plus a note that the UI language does not match.
+- **Music on a search video** → search results videos play muted; header videos too by default.

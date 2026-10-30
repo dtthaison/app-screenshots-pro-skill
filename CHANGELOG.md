@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 (2026-10-30)
+
+- App previews: `previews` in the config renders `.mp4` videos (H.264 High, 30 fps, stereo AAC, faststart) for `preview-iphone`, `preview-iphone-16-9`, `preview-iphone-4.7`, `preview-ipad`, `preview-ipad-9.7` and `preview-mac`.
+  - Scenes take stills, HTML mocks or screen recordings (`clip`, with `{locale}` and `clipLocale`), `motion` (drift, scroll, none), timed `labels`, `in`, `transition` (crossfade, push, cut, fade-through) and continuity between scenes with the same layout.
+  - Loop fades (or `loop: "hard"`), `music`, `poster` (seconds or a scene id) with a `.poster.png`, a filmstrip in `_preview/`, and a `<video>` per file in `index.html`.
+  - Checks: duration 15–30 s, up to 3 per size and locale, 500 MB, poster in a transition, clip length and aspect, "draft" notes for stills.
+  - `--previews`, `--scenes`, `--no-previews`, `--only-previews`; `--supersample` and `videoSupersample` for both passes; `renderScale` for drafts.
+  - `--fastlane` writes `out/fastlane/app-previews/<locale>/NN_<IDENT>_<id>.mp4` for `deliver`.
+- Creative assets: images `app-header`, `app-header-16-9`, `search-asset`, `search-asset-16-9`, `event-card`, `event-details` and videos `header-video`, `search-video`, `event-card-video`, `event-details-video` (1 per locale; safe-area warning; png-only check). Fastlane copies go to `out/fastlane/creative/`.
+- ffmpeg is found through `FFMPEG_PATH`, the optional `ffmpeg-static` dependency (GPL-3.0 binary downloaded at install time, not redistributed here), or `PATH`.
+- Example `examples/preview` (`npm run example:preview`, `example:preview-clip`, `test:video`) and a new "Record the app for previews" section in `references/reading-the-app.md`.
+- Known limits: landscape recordings in device frames, page-load timeouts count as errors, filtered runs rewrite `manifest.json` and `index.html`.
+
 ## 1.0.2 (2026-10-30)
 
 - Apple Watch targets take `@styled` (e.g. `"watch-ultra@styled"`): background and caption at the store size, a strap-less watch via `watch-hero` by default, still exported by `--fastlane` as watch screenshots. Wear OS stays raw.
