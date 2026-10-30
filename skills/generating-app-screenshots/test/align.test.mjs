@@ -27,6 +27,18 @@ test('alignCommands: offset from sync, tap time = frame before reaction', () => 
   assert.equal(events[3].t, (16_000 + 200 - offsetMs) / 1000);
   assert.deepEqual([events[0].t, events[0].align], [0.4, 'frame']);
 });
+test('alignCommands: overlapping windows do not claim the same reaction or the sync frame', () => {
+  const d = Float64Array.from({ length: 120 }, (_, i) => (i === 12 ? 80 : i === 40 ? 9 : 0.4));   // one reaction only
+  const cmds = [{ seq: 0, kind: 'open', startMs: 0, durMs: 300, step: 0 },
+                { seq: 1, kind: 'tap', startMs: 600, durMs: 1000, step: 1 },      // video 1.0-2.0 s: covers frame 40
+                { seq: 2, kind: 'tap', startMs: 800, durMs: 1000, step: 2 }];      // overlaps it; must not reuse frame 40
+  const { events } = alignCommands(cmds, d, 30);
+  assert.deepEqual([events[1].align, events[1].t], ['frame', 39 / 30]);
+  assert.equal(events[2].align, 'window');
+  // a window that reaches back over the sync frame must not match it
+  const early = alignCommands([{ seq: 0, kind: 'open', startMs: 0, durMs: 300, step: 0 }, { seq: 1, kind: 'tap', startMs: 0, durMs: 200, step: 1 }], d, 30);
+  assert.equal(early.events[1].align, 'window');
+});
 test('alignCommands throws when there is no sync frame', () => {
   assert.throws(() => alignCommands([{ seq: 0, kind: 'open', startMs: 0, durMs: 1, step: 0 }], new Float64Array(50), 30),
     /no full-screen change found for the sync step/);

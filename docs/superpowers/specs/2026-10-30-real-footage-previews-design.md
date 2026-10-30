@@ -560,8 +560,8 @@ Each answer is marked as either the owner's or my call.
 6. **Maestro baseline.** *My call.*
    - Maestro 2.6.1, the version installed on the owner's machine. `record.mjs` checks for at least 2.6 and prints the
      version it found.
-   - **`open` steps** use `xcrun simctl openurl <udid>`, not Maestro's `openLink`. Custom schemes opened that way show no
-     confirm dialog.
+   - **`open` steps** use Maestro `openLink` inside the take, so every step lands in one `commands-*.json` timeline. On
+     2.6.1 it showed no "Open in…?" dialog for the Settings `App-prefs:` URL; custom schemes are checked on the AptusFIT run.
    - **Setup steps** handle the dev-client launch.
    - **Keyboard.** The recorder turns the hardware keyboard off for the simulator, so `inputText` shows the soft keyboard.
      If that isn't possible, it says how to do it once.
