@@ -69,3 +69,25 @@ test('timeCode', () => {
   assert.equal(timeCode(5), '00:00:05:00');
   assert.equal(timeCode(65.5), '00:01:05:50');
 });
+test('scroll keeps scroll from 2% overflow, drifts below', () => {
+  const tl = buildTimeline({}, [{ id: 'a', motion: 'scroll', overflow: 0.03 }, { id: 'b', motion: 'scroll', overflow: 0.015 }]);
+  assert.deepEqual(tl.scenes.map((s) => s.motion), ['scroll', 'drift']);
+});
+test('poster is clamped to the preview and to the scene, with a warning', () => {
+  const short = buildTimeline({}, [{ id: 'a', duration: 3 }]);
+  const d = posterTime(short); assert.equal(d.time, 3); assert.match(d.warnings[0], /outside/);
+  const tl = buildTimeline({}, [{ id: 'a', duration: 0.5 }, { id: 'b' }]);
+  const p = posterTime(tl, 'a'); assert.equal(p.time, 0.5); assert.match(p.warnings[0], /outside/);
+});
+test('poster rest time uses the entrance length: in none rests right after the transition', () => {
+  const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', in: 'none', duration: 8 }]);
+  assert.equal(posterTime(tl, 'b').time, 4.5);
+});
+test('unknown transition or entrance and bad clips are reported', () => {
+  const tl = buildTimeline({}, [{ id: 'a', transition: 'wipe', in: 'zoom', clip: { frames: 10 } }, { id: 'b', transition: 'crossfde' }]);
+  assert.ok(tl.errors.some((e) => e === 'scene "a": unknown transition "wipe"'));
+  assert.ok(tl.errors.some((e) => e === 'scene "a": unknown entrance "zoom"'));
+  assert.ok(tl.errors.some((e) => e === 'scene "b": unknown transition "crossfde"'));
+  assert.ok(tl.errors.some((e) => e === 'scene "a": clip needs frames and fps'));
+  assert.equal(tl.scenes[1].transition.kind, 'crossfade'); assert.equal(stateAt(tl, 1).scenes[0].screen.frame, null);
+});

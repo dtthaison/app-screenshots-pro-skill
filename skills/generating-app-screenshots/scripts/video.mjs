@@ -8,7 +8,7 @@ export const ENTRANCES = {
   fade: { device: 0.6, caption: 0.5, delay: 0.1, rise: 0 },
   none: null,
 };
-const DEFAULT_DURATION = 4, FADE_IN = 0.4, FADE_OUT = 0.6, LABEL_FADE = 0.3, DRIFT = 1.03, SCROLL_MIN = 0.05;
+const DEFAULT_DURATION = 4, FADE_IN = 0.4, FADE_OUT = 0.6, LABEL_FADE = 0.3, DRIFT = 1.03, SCROLL_MIN = 0.02;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (p) => 1 - (1 - clamp01(p)) ** 3;                 // ease-out cubic
@@ -23,13 +23,18 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
     const duration = Number.isFinite(s.duration) ? s.duration : DEFAULT_DURATION;
     if (!s.id) errors.push(`scene ${index + 1}: missing id`);
     if (duration <= 0) errors.push(`scene "${s.id ?? index + 1}": duration must be above 0 (got ${duration}s)`);
-    const kind = index === 0 ? 'cut' : s.transition ?? preview.transition ?? 'crossfade';
+    const want = s.transition ?? preview.transition;
+    if (want != null && !Object.hasOwn(TRANSITIONS, want)) errors.push(`scene "${s.id}": unknown transition "${want}"`);
+    const kind = index === 0 ? 'cut' : Object.hasOwn(TRANSITIONS, want) ? want : 'crossfade';
     const start = cursor; cursor += duration;
-    const entrance = s.in in ENTRANCES ? s.in : 'rise';
-    const motion = s.clip ? 'none' : s.motion === 'scroll' && !(s.overflow >= SCROLL_MIN) ? 'drift' : s.motion ?? 'drift';
+    if (s.in != null && !Object.hasOwn(ENTRANCES, s.in)) errors.push(`scene "${s.id}": unknown entrance "${s.in}"`);
+    const entrance = Object.hasOwn(ENTRANCES, s.in) ? s.in : 'rise';
+    const clipOk = s.clip && s.clip.frames > 0 && s.clip.fps > 0;
+    if (s.clip && !clipOk) errors.push(`scene "${s.id}": clip needs frames and fps`);
+    const motion = clipOk ? 'none' : s.motion === 'scroll' && !(s.overflow >= SCROLL_MIN) ? 'drift' : s.motion ?? 'drift';
     return {
       id: s.id, index, start, end: cursor, duration, transition: { kind, dur: TRANSITIONS[kind] ?? 0 },
-      entrance, motion, clip: s.clip ?? null, overflow: s.overflow ?? 0,
+      entrance, motion, clip: clipOk ? s.clip : null, overflow: s.overflow ?? 0,
       labels: (s.labels ?? []).map((l) => ({ at: l.at ?? 0, until: l.until ?? duration, text: l.text })),
       fadeIn: 0, fadeOut: 0,
     };
@@ -89,15 +94,15 @@ export const sameState = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // Poster frame: seconds, a scene id (its rest time) or the default 5 s. Warns when the frame is mid-motion.
 export function posterTime(tl, poster) {
   const warnings = [];
-  let time = 5;
-  if (typeof poster === 'number') {
-    time = Math.min(tl.total, Math.max(0, poster));
-    if (time !== poster) warnings.push(`poster ${poster.toFixed(2)}s is outside the preview (0–${tl.total}s); using ${time}s`);
-  } else if (typeof poster === 'string') {
+  let want = 5, hi = tl.total;
+  if (typeof poster === 'number') want = poster;
+  else if (typeof poster === 'string') {
     const s = tl.scenes.find((x) => x.id === poster);
-    if (s) time = s.start + s.transition.dur + 0.6;
-    else warnings.push(`poster scene "${poster}" not found; using ${time}s`);
+    if (s) { want = s.start + s.transition.dur + entranceLen(ENTRANCES[s.entrance]); hi = Math.min(hi, s.end); }
+    else warnings.push(`poster scene "${poster}" not found; using ${want}s`);
   }
+  const time = Math.min(hi, Math.max(0, want));       // never past the end, where every scene is invisible
+  if (time !== want) warnings.push(`poster ${want.toFixed(2)}s is outside the ${hi === tl.total ? 'preview' : `scene "${poster}"`} (0–${hi}s); using ${time}s`);
   const f = `${time.toFixed(2)}s`;
   for (const s of tl.scenes) {
     if (s.transition.dur > 0 && time >= s.start - s.transition.dur && time < s.start) warnings.push(`poster ${f} falls inside the transition into scene "${s.id}"`);
