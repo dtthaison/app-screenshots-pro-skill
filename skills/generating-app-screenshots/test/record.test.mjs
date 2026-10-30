@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateRecord, substitute, writeTake, deviceClass, buildSidecar } from '../scripts/record.mjs';
+import { validateRecord, substitute, writeTake, deviceClass, buildSidecar, takeCommands, processTake } from '../scripts/record.mjs';
 
 test('validateRecord: first step must open', () => {
   assert.match(validateRecord({ steps: [{ tap: { id: 'a' } }] }).join(), /first step must be an "open"/);
@@ -50,6 +50,8 @@ test('buildSidecar: marks come from the marked steps, version 1', () => {
     { kind: 'swipe', step: 2, t: 5, align: 'window', durMs: 100 }, { kind: 'type', step: 3, t: 6, align: 'window' }];
   const s = buildSidecar({ fps: 30, width: 1206, height: 2622, device: 'iPhone 17 Pro', locale: 'en-US', offsetMs: 412, events, steps, takes: 2 });
   assert.equal(s.version, 1);
+  assert.equal(s.class, 'iphone');
+  assert.equal(s.device, 'iPhone 17 Pro');
   assert.deepEqual(s.marks, { start: 0.4, log: 3.2 });
   assert.equal(s.syncOffset, 0.412);
   assert.equal(s.takes, 2);
@@ -57,4 +59,19 @@ test('buildSidecar: marks come from the marked steps, version 1', () => {
   assert.deepEqual(s.events[1], { t: 5, kind: 'swipe', x: 0.5, y: 0.7, x2: 0.5, y2: 0.3, dur: 0.4, step: 2, align: 'window' });
   assert.deepEqual(s.events[2], { t: 6, kind: 'type', text: 'hi', step: 3, align: 'window' });
   assert.equal(s.events.length, 3);   // open is a mark/sync, not an event
+});
+
+test('takeCommands keeps wait-only steps so the take paces like the script', () => {
+  const cmds = takeCommands([{ open: 'x://a' }, { wait: 2 }, { tap: { id: 'b' }, point: { x: 0.5, y: 0.5 } }]);
+  assert.equal(cmds.filter((c) => c.extendedWaitUntil).length, 1);
+  assert.equal(cmds[0].openLink, 'x://a');
+  assert.equal(cmds.find((c) => c.tapOn).tapOn.point, '50%,50%');
+});
+
+test('processTake: an unreadable take is a failed take, not a crash', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asp-pt-'));
+  const r = await processTake({ ffmpeg: 'ffmpeg', raw: path.join(dir, 'missing.mov'), dbg: dir, dir, resolved: [], device: { name: 'x' }, locale: 'en-US', takeNo: 1 });
+  assert.equal(r.ok, false);
+  assert.match(r.log, /could not process the take/);
+  fs.rmSync(dir, { recursive: true });
 });

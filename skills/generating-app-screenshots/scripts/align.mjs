@@ -42,7 +42,10 @@ export function reactionFrame(diffs, from, to, { threshold = REACT_MAD } = {}) {
 export function alignCommands(commands, diffs, fps, { slack = 0.5 } = {}) {
   const sync = findSync(diffs);
   if (sync == null) throw new Error('no full-screen change found for the sync step — does the first step open a different screen?');
-  const offsetMs = commands[0].startMs - (sync * 1000) / fps;
+  // Anchor on the sync command's END: its start-to-screen-change latency varies with app launch time (spike: about 30
+  // frames of jitter between takes), while the change sits at a roughly fixed distance before the command returns
+  // (about 4 frames of jitter).
+  const offsetMs = commands[0].startMs + commands[0].durMs - (sync * 1000) / fps;
   // Adjacent windows can overlap, so a search starts after the sync frame and after the previous
   // command's reaction: neither can be claimed twice.
   let last = sync;
