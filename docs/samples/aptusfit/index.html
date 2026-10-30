@@ -122,11 +122,11 @@ const watch = () => D.watchImg ? D.watchSlides.map(s => src(D.watchImg, s)) : []
 const imgs = (list, cls='') => list.map(u => `<img src="${u}" loading="lazy" ${cls}>`).join('');
 const sb = (c='#000') => `<div class="sb" style="color:${c}"><span>9:41</span><span>●●●</span></div>`;
 
-// slot 1 becomes the app preview video when D.previews[locale] is set; otherwise the first screenshot
+// the app preview video (when D.previews[locale] is set) plays first, before screenshot 1, as on the store
 function iosSlides() {
   const list = ios(), pv = D.previews[st.loc];
   if (!pv) return imgs(list);
-  return `<video class="pv" muted loop playsinline controls preload="metadata" poster="${pv.poster}"><source src="${pv.video}" type="video/mp4"></video>` + imgs(list.slice(1));
+  return `<video class="pv" muted loop playsinline controls preload="metadata" poster="${pv.poster}"><source src="${pv.video}" type="video/mp4"></video>` + imgs(list);
 }
 function appstore() {
   return `<div><div class="phone"><div class="screen as">${sb()}<div class="scroll">

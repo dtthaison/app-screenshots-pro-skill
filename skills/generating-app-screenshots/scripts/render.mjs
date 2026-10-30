@@ -39,7 +39,7 @@ const SCENE_FILTER = list(flag('scenes'));
 const NO_PREVIEWS = has('no-previews'), ONLY_PREVIEWS = has('only-previews');
 // the screenshot pass renders stills only; video targets belong to the video pass
 const STILL_TARGETS = ONLY_PREVIEWS ? [] : TARGETS.filter((t) => !isVideoTarget(t));
-const VIDEO_TARGETS = NO_PREVIEWS ? [] : TARGETS.filter(isVideoTarget);
+let VIDEO_TARGETS = NO_PREVIEWS ? [] : TARGETS.filter(isVideoTarget);   // emptied when ffmpeg is missing
 const SLIDE_FILTER = list(flag('slides'));
 // theme.preset (and slide.preset) start from a curated palette; explicit values win
 function presetTheme(name) {
@@ -673,7 +673,7 @@ function previewPage(job) {
 async function fitScenes(page, job) {
   for (const sc of job.timeline.scenes) {
     await page.evaluate((st) => window.__apply(st), stateAt(job.timeline, (sc.start + sc.end) / 2));
-    const fit = await page.evaluate((sel) => window.__fit(sel), `.scene[data-scene="${sc.id}"]`);
+    const fit = await page.evaluate((id) => window.__fit(`.scene[data-scene="${CSS.escape(id)}"]`), sc.id);
     reportFit(fit, `${job.target.id}/${job.locale}/${job.preview.id}/${sc.id}`);
   }
 }
@@ -684,11 +684,19 @@ async function fitScenes(page, job) {
 async function renderPreviews(browser, jobs, ffmpeg) {
   const done = [], pages = {}, counter = {};
   const pageFor = async (scale) => (pages[scale] ||= await browser.newPage({ deviceScaleFactor: scale }));
+  // store count per target × locale before capture: the extras (config order) are not rendered
+  const perKey = {};
+  for (const job of jobs) (perKey[`${job.target.id}|${job.locale}`] ||= []).push(job);
+  for (const [k, arr] of Object.entries(perKey)) if (arr.length > arr[0].target.max) errors.push(`${k}: ${arr.length} previews, store max is ${arr[0].target.max}`);
   for (const job of jobs) {
     const { target: t, locale, W, H, preview, timeline: tl } = job;
     const tag = `${t.id}/${locale}/${preview.id}`, slug = t.id.replace('@', '_');
     for (const w of job.warnings) warn(`[${tag}] ${w}`);
+    if (perKey[`${t.id}|${locale}`].indexOf(job) >= t.max) continue;
     if (tl.errors.length) { for (const e of tl.errors) errors.push(`[${tag}] ${e}`); continue; }
+    // duration out of the target's range: error before capture (a --scenes run is partial, so it is not checked)
+    const long = checkDuration(tl, t, { sceneFilter: !!SCENE_FILTER });
+    if (long.length) { for (const e of long) errors.push(`[${tag}] ${e}`); continue; }
     const music = typeof preview.music === 'string' ? { src: preview.music } : preview.music;
     if (music && !fs.existsSync(abs(music.src))) { errors.push(`[${tag}] music not found: ${music.src}`); continue; }
     // renderScale (custom video targets, or byTarget on the preview) renders smaller and lets ffmpeg upscale
@@ -882,7 +890,7 @@ async function main() {
   // wrong format for a target (e.g. PNG-only creative assets): fail before launching Chrome
   for (const t of STILL_TARGETS) { const e = checkTargetFormat(t, FORMAT); if (e) errors.push(e); }
   // video targets need a previews entry, ffmpeg, and --previews / --scenes ids that exist
-  let ffmpeg = null;
+  let ffmpeg = null, noFfmpeg = null;
   if (VIDEO_TARGETS.length) {
     const prevs = [cfg.previews ?? []].flat();
     if (!prevs.length) errors.push(`no "previews" in the config, but video target ${VIDEO_TARGETS.map((t) => t.id).join(', ')} was requested`);
@@ -893,8 +901,14 @@ async function main() {
       for (const id of SCENE_FILTER || []) if (!sceneIds.has(id)) errors.push(`--scenes: no preview has a scene "${id}"`);
       try {
         ffmpeg = findFfmpeg();
-        if (!ffmpeg) errors.push('previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg');
-      } catch (e) { errors.push(e.message); }   // FFMPEG_PATH set but missing
+        if (!ffmpeg) noFfmpeg = 'previews need ffmpeg: npm install (ffmpeg-static), set FFMPEG_PATH, or brew install ffmpeg';
+      } catch (e) { noFfmpeg = e.message; }   // FFMPEG_PATH set but missing
+      // no ffmpeg: the screenshot pass still renders, the video targets are dropped, and the run exits 1 at the end
+      if (noFfmpeg) {
+        noFfmpeg += ' — or run with --no-previews';
+        if (!STILL_TARGETS.length) errors.push(noFfmpeg);
+        VIDEO_TARGETS = [];
+      }
     }
   }
   if (ONLY_PREVIEWS && !VIDEO_TARGETS.length) warn('--only-previews: no video targets in this run (add preview-iphone, … to "targets")');
@@ -1006,6 +1020,7 @@ async function main() {
   for (const p of Object.values(pages)) await p.close();
 
   // ---------- app previews (video) ----------
+  if (noFfmpeg) errors.push(noFfmpeg);   // after the mock re-render, which resets errors
   const previews = ffmpeg ? await renderPreviews(browser, await previewJobs(browser, { ffmpeg }), ffmpeg) : [];
   await browser.close();
 
@@ -1026,22 +1041,20 @@ async function main() {
     if (arr.length > t.max) errors.push(`${k}: ${arr.length} screenshots, store max is ${t.max}`);
     if (t.min && arr.length < t.min) warn(`${k}: ${arr.length} screenshots, store minimum is ${t.min}`);
   }
+  // duration and count were checked before capture (renderPreviews); a file over the size limit is an error and is
+  // left out of the fastlane copies and the manifest
   const pvKey = {};
   for (const p of previews) {
-    const { target: t, locale, preview, timeline: tl } = p.job;
-    for (const e of checkDuration(tl, t, { sceneFilter: !!SCENE_FILTER })) errors.push(`[${p.tag}] ${e}`);
-    if (fs.statSync(p.file).size > t.video.maxMB * 1024 * 1024) errors.push(`${p.file}: larger than ${t.video.maxMB} MB`);
+    const { target: t, locale, preview } = p.job;
+    if (fs.statSync(p.file).size > t.video.maxMB * 1024 * 1024) { errors.push(`${p.file}: larger than ${t.video.maxMB} MB`); p.failed = true; }
     if (preview.music && t.baseId === 'search-video') warn(`[${p.tag}] search results videos cannot be unmuted — music is wasted bytes`);
     if (p.stills && t.family === 'creative') notes.push(`${t.id}/${locale}/${preview.id}.mp4 is a draft: every scene is a still; Apple wants the main flow recorded (see reading-the-app.md §2b)`);
     else if (p.stills && t.asc) notes.push(`[${p.tag}] every scene is a still — fine for a draft; record the app for the final preview`);
     for (const w of p.posterWarnings) warn(`[${p.tag}] ${w}`);
     (pvKey[`${t.id}|${locale}`] ||= []).push(p);
   }
-  for (const [k, arr] of Object.entries(pvKey)) {
-    const t = arr[0].job.target;
-    if (arr.length > t.max) errors.push(`${k}: ${arr.length} previews, store max is ${t.max}`);
-  }
   if (SCENE_FILTER && previews.length) notes.push('--scenes given: duration check skipped');
+  const shipped = previews.filter((p) => !p.failed);
 
   // ---------- fastlane layout (deliver / supply) ----------
   if (has('fastlane') || cfg.fastlane) {
@@ -1060,7 +1073,7 @@ async function main() {
       fs.copyFileSync(m.file, dest);
     }
     // deliver uploads app previews from app-previews/<locale>/, device type from the filename (IPHONE_67, ...)
-    for (const p of previews) {
+    for (const p of shipped) {
       const t = p.job.target, loc = storeLocale(p.job.locale, 'ios');
       let dest;
       if (t.asc) dest = path.join(OUT, 'fastlane', 'app-previews', loc, `${String(p.index).padStart(2, '0')}_${t.asc}_${p.job.preview.id}.mp4`);
@@ -1072,7 +1085,7 @@ async function main() {
       fs.copyFileSync(p.file, dest);
     }
     // deliver sets one poster time (preview_frame_time_code, default 5 s) for the whole upload
-    const codes = [...new Set(previews.filter((p) => p.job.target.asc).map((p) => timeCode(p.posterTime)))];
+    const codes = [...new Set(shipped.filter((p) => p.job.target.asc).map((p) => timeCode(p.posterTime)))];
     if (codes.length > 1) warn(`previews in this run have different poster times (${codes.join(', ')}) — deliver takes one preview_frame_time_code for the whole upload`);
     const code = codes.find((c) => c !== timeCode(5));
     if (code) notes.push(`deliver: pass preview_frame_time_code "${code}"`);
@@ -1138,7 +1151,7 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
   }
 
   // previews: JSON-safe fields only (target.video can hold Infinity)
-  const pvJson = previews.map((p) => ({ id: p.job.preview.id, target: p.job.target.id, locale: p.job.locale, index: p.index,
+  const pvJson = shipped.map((p) => ({ id: p.job.preview.id, target: p.job.target.id, locale: p.job.locale, index: p.index,
     file: path.relative(OUT, p.file), poster: path.relative(OUT, p.poster), posterTime: p.posterTime, duration: p.job.timeline.total }));
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ generated: new Date().toISOString(), files: manifest.map((m) => ({ ...m, file: path.relative(OUT, m.file) })), previews: pvJson, warnings, errors }, null, 2));
   console.log(`Rendered ${manifest.length} screenshots + ${previews.length} previews → ${OUT}`);

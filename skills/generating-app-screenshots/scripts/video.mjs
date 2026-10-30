@@ -15,19 +15,23 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const ease = (p) => 1 - (1 - clamp01(p)) ** 3;                 // ease-out cubic
 const prog = (t, from, len) => (len > 0 ? ease((t - from) / len) : t >= from ? 1 : 0);
 const entranceLen = (e) => (e ? e.delay + e.caption : 0);      // device (0.6) ends with the caption (0.1 + 0.5)
+const ms = (x) => Math.round(x * 1000) / 1000;                 // 3 + 3.4 + 11.8 + 11.8 is 30.000000000000004 in floats
+const secs = (x) => `${+x.toFixed(2)}s`;                       // for messages: at most two decimals
 
 export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
   const errors = [];
   const soft = (preview.loop ?? 'soft') !== 'hard';
   let cursor = 0;
   const out = scenes.map((s, index) => {
+    const numeric = s.duration === undefined || Number.isFinite(s.duration);
     const duration = Number.isFinite(s.duration) ? s.duration : DEFAULT_DURATION;
     if (!s.id) errors.push(`scene ${index + 1}: missing id`);
-    if (duration <= 0) errors.push(`scene "${s.id ?? index + 1}": duration must be above 0 (got ${duration}s)`);
+    if (!numeric) errors.push(`scene "${s.id ?? index + 1}": duration must be a number of seconds`);
+    else if (duration <= 0) errors.push(`scene "${s.id ?? index + 1}": duration must be above 0 (got ${secs(duration)})`);
     const want = s.transition ?? preview.transition;
     if (want != null && !Object.hasOwn(TRANSITIONS, want)) errors.push(`scene "${s.id}": unknown transition "${want}"`);
     const kind = index === 0 ? 'cut' : Object.hasOwn(TRANSITIONS, want) ? want : 'crossfade';
-    const start = cursor; cursor += duration;
+    const start = cursor; cursor = ms(cursor + duration);
     if (s.in != null && !Object.hasOwn(ENTRANCES, s.in)) errors.push(`scene "${s.id}": unknown entrance "${s.in}"`);
     const entrance = Object.hasOwn(ENTRANCES, s.in) ? s.in : 'rise';
     const clipOk = s.clip && s.clip.frames > 0 && s.clip.fps > 0;
@@ -46,10 +50,10 @@ export function buildTimeline(preview = {}, scenes = [], { fps = FPS } = {}) {
   out.forEach((s, i) => {
     const mine = s.transition, next = out[i + 1]?.transition;
     for (const tr of [i > 0 && mine, next]) {
-      if (tr && tr.dur > 0 && s.duration < tr.dur) errors.push(`scene "${s.id}": duration ${s.duration}s is shorter than its ${tr.kind} transition (${tr.dur}s)`);
+      if (tr && tr.dur > 0 && s.duration < tr.dur) errors.push(`scene "${s.id}": duration ${secs(s.duration)} is shorter than its ${tr.kind} transition (${secs(tr.dur)})`);
     }
   });
-  return { fps, total: cursor, frames: Math.round(cursor * fps), scenes: out, errors };
+  return { fps, total: cursor, frames: Math.round(cursor * fps), scenes: out, errors };   // starts, ends and total are whole ms
 }
 
 export function stateAt(tl, t) {
@@ -96,15 +100,19 @@ export const sameState = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // Poster frame: seconds, a scene id (its rest time) or the default 5 s. Warns when the frame is mid-motion.
 export function posterTime(tl, poster) {
   const warnings = [];
-  let want = 5, hi = tl.total;
+  let want = 5, lo = 0, hi = tl.total, scene = null;
   if (typeof poster === 'number') want = poster;
   else if (typeof poster === 'string') {
-    const s = tl.scenes.find((x) => x.id === poster);
-    if (s) { want = s.start + s.transition.dur + entranceLen(ENTRANCES[s.entrance]); hi = Math.min(hi, s.end); }
-    else warnings.push(`poster scene "${poster}" not found; using ${want}s`);
+    scene = tl.scenes.find((x) => x.id === poster);
+    if (scene) {
+      // the entrance starts with the transition into the scene; rest = entrance over, and the scene fully in
+      const s = scene, next = tl.scenes[s.index + 1]?.transition.dur ?? 0;
+      want = ms(Math.max(s.start, s.start - s.transition.dur + entranceLen(ENTRANCES[s.entrance])));
+      lo = s.start; hi = Math.min(hi, ms(s.end - next));  // before the next scene covers it
+    } else warnings.push(`poster scene "${poster}" not found; using ${want}s`);
   }
-  const time = Math.min(hi, Math.max(0, want));       // never past the end, where every scene is invisible
-  if (time !== want) warnings.push(`poster ${want.toFixed(2)}s is outside the ${hi === tl.total ? 'preview' : `scene "${poster}"`} (0–${hi}s); using ${time}s`);
+  const time = Math.min(hi, Math.max(lo, want));      // never past the end, where every scene is invisible
+  if (time !== want) warnings.push(`poster ${want.toFixed(2)}s is outside the ${scene ? `scene "${poster}"` : 'preview'} (${+lo.toFixed(2)}–${secs(hi)}); using ${secs(time)}`);
   const f = `${time.toFixed(2)}s`;
   for (const s of tl.scenes) {
     if (s.transition.dur > 0 && time >= s.start - s.transition.dur && time < s.start) warnings.push(`poster ${f} falls inside the transition into scene "${s.id}"`);
@@ -125,7 +133,7 @@ export function checkDuration(tl, target, { sceneFilter = false } = {}) {
   const bad = tl.total < v.minSec || (Number.isFinite(v.maxSec) && tl.total > v.maxSec);
   if (!bad) return [];
   const range = Number.isFinite(v.maxSec) ? `${v.minSec}–${v.maxSec}s` : `at least ${v.minSec}s`;
-  return [`preview is ${tl.total}s; ${target.id} wants ${range}`];
+  return [`preview is ${secs(tl.total)}; ${target.id} wants ${range}`];
 }
 
 export const timeCode = (s) => {
@@ -236,7 +244,8 @@ export function encodeArgs({ fps, width, height, out, total, music, scaleTo }) {
   if (music) {
     const f = [];
     if (music.volume != null) f.push(`volume=${music.volume}`);
-    if (music.fadeOut > 0) f.push(`afade=t=out:st=${+(total - music.fadeOut).toFixed(3)}:d=${music.fadeOut}`);
+    // a fade longer than the video starts at 0 (ffmpeg rejects a negative st)
+    if (music.fadeOut > 0) f.push(`afade=t=out:st=${+Math.max(0, total - music.fadeOut).toFixed(3)}:d=${+Math.min(music.fadeOut, total).toFixed(3)}`);
     if (f.length) a.push('-af', f.join(','));
   }
   a.push('-t', String(total), '-movflags', '+faststart', '-y', out);

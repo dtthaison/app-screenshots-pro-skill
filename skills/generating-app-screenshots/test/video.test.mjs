@@ -76,7 +76,8 @@ test('sameState detects rest frames', () => {
 test('poster: default 5, scene id → rest time, inside a transition warns', () => {
   const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', duration: 8 }]);
   assert.equal(posterTime(tl).time, 5);
-  assert.equal(posterTime(tl, 'b').time, 4 + 0.5 + 0.6);        // crossfade 0.5 + entrance 0.6 (0.1 delay + 0.5 caption) over, then rest
+  assert.equal(posterTime(tl, 'b').time, 4.1);                  // the entrance (0.1 delay + 0.5 caption) starts with the 0.5 crossfade: 4 + 0.6 − 0.5
+  assert.deepEqual(posterTime(tl, 'b').warnings, []);
   assert.match(posterTime(tl, 3.8).warnings[0], /transition/);
   assert.match(posterTime(tl, 0.2).warnings[0], /entrance|fade/);
 });
@@ -97,11 +98,31 @@ test('poster is clamped to the preview and to the scene, with a warning', () => 
   const short = buildTimeline({}, [{ id: 'a', duration: 3 }]);
   const d = posterTime(short); assert.equal(d.time, 3); assert.match(d.warnings[0], /outside/);
   const tl = buildTimeline({}, [{ id: 'a', duration: 0.5 }, { id: 'b' }]);
-  const p = posterTime(tl, 'a'); assert.equal(p.time, 0.5); assert.match(p.warnings[0], /outside/);
+  const p = posterTime(tl, 'a'); assert.equal(p.time, 0); assert.match(p.warnings[0], /outside/);   // 0.5 s end − 0.5 s crossfade out
 });
-test('poster rest time uses the entrance length: in none rests right after the transition', () => {
+test('poster rest time uses the entrance length: in none rests at the scene start, once the transition is over', () => {
   const tl = buildTimeline({}, [{ id: 'a' }, { id: 'b', in: 'none', duration: 8 }]);
-  assert.equal(posterTime(tl, 'b').time, 4.5);
+  assert.equal(posterTime(tl, 'b').time, 4);
+});
+test('poster by scene id stays inside the scene, before the next scene covers it, and names the scene range', () => {
+  const p = posterTime(buildTimeline({}, [{ id: 'a' }, { id: 'b', duration: 1 }, { id: 'c' }]), 'b');
+  assert.equal(p.time, 4.1); assert.deepEqual(p.warnings, []);
+  // b is 4–4.6 and c pushes in over its last 0.6 s, so b is fully shown only at 4.0; its rest time 4.1 is clamped
+  const w = posterTime(buildTimeline({}, [{ id: 'a' }, { id: 'b', duration: 0.6 }, { id: 'c', transition: 'push' }]), 'b');
+  assert.equal(w.time, 4);
+  assert.match(w.warnings[0], /^poster 4\.10s is outside the scene "b" \(4–4s\); using 4s$/);
+});
+test('durations sum to whole milliseconds: 3 + 3.4 + 11.8 + 11.8 is a valid 30 s preview', () => {
+  const tl = buildTimeline({}, [3, 3.4, 11.8, 11.8].map((duration, i) => ({ id: `s${i}`, duration })));
+  assert.equal(tl.total, 30); assert.equal(tl.frames, 900);
+  assert.deepEqual(tl.scenes.map((s) => s.end), [3, 6.4, 18.2, 30]);
+  assert.deepEqual(checkDuration(tl, { id: 'preview-iphone', video: { minSec: 15, maxSec: 30 } }), []);
+  assert.equal(checkDuration(buildTimeline({}, [{ id: 'a', duration: 35.1234 }]), { id: 'preview-iphone', video: { minSec: 15, maxSec: 30 } })[0], 'preview is 35.12s; preview-iphone wants 15–30s');
+});
+test('a duration that is not a number is an error; only a missing duration defaults to 4', () => {
+  const tl = buildTimeline({}, [{ id: 'x', duration: '7' }, { id: 'y', duration: null }, { id: 'z' }]);
+  assert.deepEqual(tl.errors, ['scene "x": duration must be a number of seconds', 'scene "y": duration must be a number of seconds']);
+  assert.equal(tl.scenes[2].duration, 4);
 });
 test('unknown transition or entrance and bad clips are reported', () => {
   const tl = buildTimeline({}, [{ id: 'a', transition: 'wipe', in: 'zoom', clip: { frames: 10 } }, { id: 'b', transition: 'crossfde' }]);
@@ -129,6 +150,10 @@ test('encodeArgs: level 4.0 and 11M up to 8192 macroblocks; above, no -level and
 test('encodeArgs with music trims to total and fades out', () => {
   const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 20, music: { src: 'm.mp3', volume: 0.8, fadeOut: 1.5 } }).join(' ');
   assert.ok(a.includes('-i m.mp3') && a.includes('volume=0.8') && a.includes('afade=t=out:st=18.5:d=1.5'));
+});
+test('encodeArgs: a music fadeOut longer than the video starts at 0 and lasts the video', () => {
+  const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 2, music: { src: 'm.mp3', fadeOut: 4 } }).join(' ');
+  assert.ok(a.includes('afade=t=out:st=0:d=2'), a);
 });
 test('encodeArgs scaleTo adds a lanczos scale filter', () => {
   const a = encodeArgs({ fps: 30, width: 886, height: 1920, out: 'x.mp4', total: 2, music: null, scaleTo: { w: 443, h: 960 } }).join(' ');
