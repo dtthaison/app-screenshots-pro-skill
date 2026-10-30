@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AptusFIT Sample</title>
+<style>
+:root{--bg:#eef1f5;--panel:#fff;--ink:#111418;--muted:#667085;--line:#e3e7ee;--accent:#0078cc;--chip:#f2f4f7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;min-height:100vh}
+nav{position:sticky;top:0;height:100vh;overflow:auto;width:250px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:16px 12px}
+nav h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 6px 6px}
+nav button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:8px;font:inherit;color:var(--ink);cursor:pointer}
+nav button:hover{background:var(--chip)} nav button.on{background:#e6f4ff;color:var(--accent);font-weight:600}
+main{flex:1;min-width:0;padding:18px 26px 60px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:6px}
+.bar h1{font-size:20px;margin:0 12px 0 0}
+/* language picker */
+.lang{position:relative}
+.lang-btn{display:inline-flex;align-items:center;gap:10px;padding:6px 12px 6px 8px;border:1px solid var(--line);border-radius:12px;background:#fff;font:inherit;color:var(--ink);cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.06);transition:border-color .15s,box-shadow .15s}
+.lang-btn:hover{border-color:#c4cfdd}
+.lang-btn:focus-visible,.lang-btn[aria-expanded=true]{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(0,120,204,.14)}
+.flag{font-size:22px;line-height:1;width:30px;height:30px;display:grid;place-items:center;background:var(--chip);border-radius:8px;flex:none}
+.lang-txt{display:flex;flex-direction:column;text-align:left;line-height:1.2}
+.lang-txt .n{font-weight:600} .lang-txt .e{font-size:11.5px;color:var(--muted)}
+.chev{color:var(--muted);margin-left:4px;transition:transform .2s}
+.lang-btn[aria-expanded=true] .chev{transform:rotate(180deg)}
+.lang-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:20;width:600px;max-width:calc(100vw - 32px);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 48px -12px rgba(16,24,40,.28);padding:10px;opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top left;pointer-events:none;transition:opacity .15s,transform .15s}
+.lang-pop.open{opacity:1;transform:none;pointer-events:auto}
+.lang-pop .hd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:4px 8px 8px;display:flex;justify-content:space-between}
+.lang-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.lang-opt{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;border:1px solid transparent;background:none;font:inherit;color:var(--ink);cursor:pointer;position:relative;min-width:0}
+.lang-opt:hover,.lang-opt:focus-visible{background:var(--chip);outline:none}
+.lang-opt:focus-visible{border-color:#b9d9f2}
+.lang-opt .lang-txt{min-width:0} .lang-opt .lang-txt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lang-opt[aria-selected=true]{background:#e6f4ff;border-color:#b9d9f2}
+.lang-opt[aria-selected=true] .n{color:var(--accent)}
+.lang-opt[aria-selected=true]::after{content:"✓";position:absolute;right:10px;color:var(--accent);font-weight:700}
+@media (max-width:640px){.bar{position:relative}.lang{position:static}.lang-pop{left:0;right:0;width:auto}.lang-grid{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){.lang-pop,.chev{transition:none}}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 18px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.desc{color:var(--muted);margin:0}
+.stage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.caption{font-size:12px;color:var(--muted);margin:8px 0 0;max-width:420px}
+/* phone shell for the store mocks */
+.phone{width:390px;height:844px;border-radius:52px;background:#000;padding:12px;box-shadow:0 20px 50px rgba(0,0,0,.18);flex:none}
+.screen{width:100%;height:100%;border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.sb{height:46px;flex:none;display:flex;justify-content:space-between;align-items:flex-end;padding:0 28px 6px;font-weight:600;font-size:14px}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.hs{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 18px 6px;scrollbar-width:none}
+.hs::-webkit-scrollbar{display:none} .hs img{scroll-snap-align:start;flex:none;display:block}
+/* App Store (light) */
+.as{background:#fff;color:#000}
+.as .head{display:flex;gap:14px;padding:10px 18px 14px}
+.as .icon{width:108px;height:108px;border-radius:24px;border:1px solid #eee;flex:none}
+.as .name{font-size:22px;font-weight:700;line-height:1.15}
+.as .sub{color:#8a8a8e;font-size:14px;margin-top:2px}
+.get{margin-top:12px;display:inline-block;background:#0a84ff;color:#fff;font-weight:700;border-radius:999px;padding:5px 20px;font-size:15px}
+.as .meta{display:flex;border-top:1px solid #eee;border-bottom:1px solid #eee;margin:0 18px 14px;padding:8px 0;text-align:center;font-size:11px;color:#8a8a8e}
+.as .meta div{flex:1} .as .meta b{display:block;color:#3c3c43;font-size:16px}
+.as .hs img{width:218px;border-radius:18px;border:1px solid #eee}
+.sec{font-weight:700;font-size:20px;padding:4px 18px 10px}
+.para{padding:12px 18px;color:#3c3c43;font-size:14px}
+/* App Store search result */
+.search .bar2{margin:6px 16px 12px;background:#eeeef0;border-radius:10px;padding:8px 12px;color:#8a8a8e}
+.row1{display:flex;gap:10px;align-items:center;padding:0 16px}
+.row1 .icon{width:62px;height:62px;border-radius:14px;border:1px solid #eee}
+.row1 .t{flex:1} .row1 .n{font-weight:600;font-size:16px} .row1 .s{color:#8a8a8e;font-size:13px}
+.trio{display:flex;gap:6px;padding:12px 16px}
+.trio img{width:calc((100% - 12px)/3);border-radius:10px;border:1px solid #eee}
+/* Google Play (light) */
+.gp{background:#fff;color:#1f1f1f;font-family:Roboto,"Segoe UI",system-ui,sans-serif}
+.gp .fg{width:100%;display:block}
+.gp .head{display:flex;gap:16px;padding:16px 20px 6px;align-items:center}
+.gp .icon{width:72px;height:72px;border-radius:16px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.gp .name{font-size:22px;font-weight:500} .gp .dev{color:#01875f;font-size:14px;font-weight:500}
+.gp .meta{display:flex;padding:12px 20px;font-size:12px;color:#5f6368;text-align:center}
+.gp .meta div{flex:1} .gp .meta b{display:block;color:#1f1f1f;font-size:14px}
+.install{margin:6px 20px 16px;background:#01875f;color:#fff;text-align:center;border-radius:10px;padding:10px;font-weight:500}
+.gp .hs{padding:0 20px 6px;gap:8px} .gp .hs img{width:150px;border-radius:10px}
+.gp .sec{font-size:18px;font-weight:500;padding:16px 20px 6px}
+/* raw grid */
+.grid{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.grid img{height:420px;border-radius:10px;flex:none}
+.grid.and img{height:380px}
+.fgbig{max-width:760px;width:100%;border-radius:10px;margin-top:12px}
+h2{font-size:15px;margin:22px 0 8px}
+.intro{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin-bottom:18px;max-width:900px}
+.intro a{color:var(--accent);text-decoration:none;font-weight:600;font-size:13px}
+.intro h2{font-size:22px;margin:8px 0 6px} .intro p{margin:0 0 6px;color:#344054} .intro .fine{font-size:12px;color:var(--muted);margin:0}
+@media (max-width:900px){body{display:block}nav{position:static;width:auto;height:auto}}
+</style></head><body>
+<nav id="nav"></nav>
+<main>
+  <div id="intro"></div>
+  <div class="bar"><h1 id="title"></h1>
+    <div class="lang" id="lang">
+      <button class="lang-btn" id="lang-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Screenshot language"></button>
+      <div class="lang-pop" id="lang-pop"><div class="hd"><span>Screenshot language</span><span>12 languages</span></div>
+        <div class="lang-grid" id="lang-grid" role="listbox"></div></div>
+    </div></div>
+  <p class="desc" id="desc"></p>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+</main>
+<script>
+const D = {"groups": [{"title": "Curated styles", "items": [{"id": "a-midnight-blue", "title": "A · Midnight Blue", "desc": "Brand navy + blue, mixed classic layouts."}, {"id": "b-signature", "title": "B · Signature", "desc": "Spotlight, giant PLAN type, lens on the timer, ticker, orbit chips, PR card, arch."}, {"id": "c-light-clean", "title": "C · Light & Clean", "desc": "Pale blue paper, dark text; the dark app screens pop."}, {"id": "d-bold-energy", "title": "D · Bold Energy", "desc": "Near-black + electric lime, UPPERCASE, tilted corner phones."}]}, {"title": "Color presets", "items": [{"id": "s-aurora", "title": "Aurora", "desc": "Same layouts as A, different palette."}, {"id": "s-midnight", "title": "Midnight", "desc": "Same layouts as A, different palette."}, {"id": "s-sunset", "title": "Sunset", "desc": "Same layouts as A, different palette."}, {"id": "s-ocean", "title": "Ocean", "desc": "Same layouts as A, different palette."}, {"id": "s-forest", "title": "Forest", "desc": "Same layouts as A, different palette."}, {"id": "s-mint", "title": "Mint", "desc": "Same layouts as A, different palette."}, {"id": "s-paper", "title": "Paper", "desc": "Same layouts as A, different palette."}, {"id": "s-candy", "title": "Candy", "desc": "Same layouts as A, different palette."}, {"id": "s-citrus", "title": "Citrus", "desc": "Same layouts as A, different palette."}, {"id": "s-lilac", "title": "Lilac", "desc": "Same layouts as A, different palette."}, {"id": "s-coral", "title": "Coral", "desc": "Same layouts as A, different palette."}, {"id": "s-mono", "title": "Mono", "desc": "Same layouts as A, different palette."}]}, {"title": "Panorama · signature (nothing cut by the store gap)", "items": [{"id": "pano-wave-ride", "title": "Wave ride", "desc": "A glowing wave runs through the set; each phone rides it."}, {"id": "pano-timeline", "title": "Timeline", "desc": "Journey line: Start → Plan → Train → Adapt → Ask → Grow → Anywhere."}, {"id": "pano-giant-word", "title": "Giant word", "desc": "“TRAIN SMARTER” runs behind the phones."}, {"id": "pano-constellation", "title": "Constellation", "desc": "Phones at different heights joined by star-map lines."}, {"id": "pano-stage", "title": "Stage", "desc": "One stage floor with a spotlight on each phone."}, {"id": "pano-ticker", "title": "Ticker", "desc": "Two marquee bands run through the whole set."}]}, {"title": "Panorama · classic", "items": [{"id": "pano-flow", "title": "Flow", "desc": "One centered phone per card; only the background connects. Safest."}, {"id": "pano-peek", "title": "Peek", "desc": "Phones sit off-center and peek into the next card."}, {"id": "pano-cascade", "title": "Cascade", "desc": "Phones step down and lean into the next card."}, {"id": "pano-zigzag", "title": "Zigzag", "desc": "Phones alternate high/low, hugging the seams."}, {"id": "pano-bridge", "title": "Bridge", "desc": "Phones straddle every other seam; the store gap cuts them."}, {"id": "pano-crossing", "title": "Crossing", "desc": "Crossed phone pairs over seams; cut by the store gap."}, {"id": "pano-scatter", "title": "Scatter", "desc": "Many small tilted phones, collage style."}, {"id": "pano-giant", "title": "Giant", "desc": "One oversized phone spans cards 2–3; cut by the gap. On Google Play it covers the card-3 caption in ko, th and Chinese."}, {"id": "pano-landscape-lay", "title": "Landscape lay", "desc": "Built for landscape screens; AptusFIT has none, so UI is cropped."}]}], "locales": [["en-US", "English", "English (US)", "🇺🇸"], ["de", "Deutsch", "German", "🇩🇪"], ["es-ES", "Español", "Spanish", "🇪🇸"], ["fr", "Français", "French", "🇫🇷"], ["id", "Bahasa Indonesia", "Indonesian", "🇮🇩"], ["ja", "日本語", "Japanese", "🇯🇵"], ["ko", "한국어", "Korean", "🇰🇷"], ["ms", "Bahasa Melayu", "Malay", "🇲🇾"], ["th", "ไทย", "Thai", "🇹🇭"], ["vi", "Tiếng Việt", "Vietnamese", "🇻🇳"], ["zh-Hans", "简体中文", "Chinese, Simplified", "🇨🇳"], ["zh-Hant", "繁體中文", "Chinese, Traditional", "🇹🇼"]], "slides": ["01_home", "02_plan", "03_session", "04_swap", "05_coach", "06_progress", "07_profile"], "img": "img", "ext": "webp", "icon": "icon.png", "intro": "<div class=\"intro\">\n  <a href=\"../../\">← App Screenshots Pro Skill</a>\n  <h2>Real app sample: AptusFIT</h2>\n  <p>31 screenshot options for one app, in 12 languages, previewed the way shoppers see them in the App Store and Google Play.\n  Every image was rendered by the skill from simulator captures of the real app and one config per option.\n  Pick an option on the left, then switch language and store.</p>\n  <p class=\"fine\">Images are reduced for the web. The Google Play set reuses the iPhone captures. Captions are machine translated and not yet reviewed by native speakers.</p>\n</div>", "subtitle": {"en-US": "AI Personal Trainer", "de": "KI-Personaltrainer", "es-ES": "Entrenador personal IA", "fr": "Coach sportif IA", "id": "Pelatih Pribadi AI", "ja": "AIパーソナルトレーナー", "ko": "AI 퍼스널 트레이너", "ms": "Jurulatih Peribadi AI", "th": "เทรนเนอร์ส่วนตัว AI", "vi": "Huấn luyện viên AI", "zh-Hans": "AI 私人教练", "zh-Hant": "AI 私人教練"}};
+const items = D.groups.flatMap(g => g.items);
+const st = { id: items[0].id, loc: 'en-US', tab: 'appstore' };
+try { Object.assign(st, JSON.parse(localStorage.getItem('shots-compare') || '{}')); } catch {}
+if (!items.some(i => i.id === st.id)) st.id = items[0].id;
+if (!D.locales.some(l => l[0] === st.loc)) st.loc = 'en-US';
+const save = () => { try { localStorage.setItem('shots-compare', JSON.stringify(st)); } catch {} };
+const TABS = [['appstore','App Store page'],['search','App Store search'],['play','Google Play'],['all','All images']];
+const src = (t, s) => `${D.img}/${st.id}/${t}/${st.loc}/${s}.${D.ext}`;
+const ios = () => D.slides.map(s => src('ios-6.9', s));
+const and = () => D.slides.map(s => src('android-phone', s));
+const fg = () => src('play-feature-graphic', '01_feature');
+const imgs = (list, cls='') => list.map(u => `<img src="${u}" loading="lazy" ${cls}>`).join('');
+const sb = (c='#000') => `<div class="sb" style="color:${c}"><span>9:41</span><span>●●●</span></div>`;
+
+function appstore() {
+  return `<div><div class="phone"><div class="screen as">${sb()}<div class="scroll">
+    <div class="head"><img class="icon" src="${D.icon}"><div><div class="name">AptusFIT</div>
+      <div class="sub">${D.subtitle[st.loc]}</div><span class="get">Get</span></div></div>
+    <div class="meta"><div><b>—</b>Ratings</div><div><b>—</b>Age</div><div><b>—</b>Category</div></div>
+    <div class="hs">${imgs(ios())}</div>
+    <div class="para">Swipe the screenshots sideways — this is the product page shoppers land on.</div>
+  </div></div></div><p class="caption">App Store product page: about 1½ screenshots are visible; shoppers swipe for the rest. Store stats are blank on purpose.</p></div>`;
+}
+function search() {
+  const three = ios().slice(0, 3);
+  return `<div><div class="phone"><div class="screen as search">${sb()}<div class="scroll">
+    <div class="bar2">🔍 fitness coach</div>
+    <div class="row1"><img class="icon" src="${D.icon}"><div class="t"><div class="n">AptusFIT</div><div class="s">${D.subtitle[st.loc]}</div></div><span class="get" style="margin:0">Get</span></div>
+    <div class="trio">${imgs(three)}</div>
+    <div style="height:1px;background:#eee;margin:8px 16px"></div>
+    <div class="row1" style="opacity:.35"><div class="icon" style="background:#ddd"></div><div class="t"><div class="n">Another app</div><div class="s">Fitness</div></div><span class="get" style="margin:0">Get</span></div>
+  </div></div></div><p class="caption">App Store search: only the first 3 screenshots show, side by side — most people decide here.</p></div>`;
+}
+function play() {
+  return `<div><div class="phone"><div class="screen gp">${sb()}<div class="scroll">
+    <div class="head"><img class="icon" src="${D.icon}"><div><div class="name">AptusFIT</div><div class="dev">AptusFIT</div></div></div>
+    <div class="meta"><div><b>—</b>Reviews</div><div><b>—</b>Downloads</div><div><b>—</b>Rated</div></div>
+    <div class="install">Install</div>
+    <div class="hs">${imgs(and())}</div>
+    <div class="sec">About this app</div>
+    <div class="para">${D.subtitle[st.loc]}</div>
+  </div></div></div><p class="caption">Google Play listing: screenshots in a sideways carousel. Store stats are blank on purpose.</p></div>
+  <div style="flex:1;min-width:300px"><h2>Feature graphic (1024×500)</h2><img class="fgbig" src="${fg()}">
+  <p class="caption">Play shows this in featured placements, promo cards and on large screens.</p></div>`;
+}
+function all() {
+  return `<div style="width:100%"><h2>App Store · iPhone 6.9″</h2><div class="grid">${imgs(ios())}</div>
+    <h2>Google Play · phone</h2><div class="grid and">${imgs(and())}</div>
+    <h2>Google Play · feature graphic</h2><img class="fgbig" src="${fg()}"></div>`;
+}
+function render() {
+  const it = items.find(i => i.id === st.id) || items[0];
+  document.getElementById('title').textContent = it.title;
+  document.getElementById('desc').textContent = it.desc;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.id === st.id));
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === st.tab));
+  const L = D.locales.find(l => l[0] === st.loc) || D.locales[0];
+  langBtn.innerHTML = `<span class="flag">${L[3]}</span><span class="lang-txt"><span class="n">${L[1]}</span><span class="e">${L[2]}</span></span><svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  langGrid.querySelectorAll('.lang-opt').forEach(b => b.setAttribute('aria-selected', b.dataset.loc === st.loc));
+  const v = { appstore, search, play, all }[st.tab]();
+  document.getElementById('view').innerHTML = `<div class="stage">${v}</div>`;
+  save();
+}
+document.getElementById('intro').innerHTML = D.intro;
+document.getElementById('nav').innerHTML = `<b>${items.length} options</b>` + D.groups.map(g =>
+  `<h3>${g.title}</h3>` + g.items.map(i => `<button data-id="${i.id}">${i.title}</button>`).join('')).join('');
+document.getElementById('nav').onclick = e => { const b = e.target.closest('button'); if (b) { st.id = b.dataset.id; render(); } };
+const langBtn = document.getElementById('lang-btn'), langPop = document.getElementById('lang-pop'), langGrid = document.getElementById('lang-grid');
+langGrid.innerHTML = D.locales.map(([c, n, e, f]) =>
+  `<button class="lang-opt" role="option" data-loc="${c}"><span class="flag">${f}</span><span class="lang-txt"><span class="n">${n}</span><span class="e">${e}</span></span></button>`).join('');
+const opts = () => [...langGrid.querySelectorAll('.lang-opt')];
+function openLang(open) {
+  langPop.classList.toggle('open', open);
+  langBtn.setAttribute('aria-expanded', open);
+  if (open) (langGrid.querySelector('[aria-selected=true]') || opts()[0]).focus();
+}
+langBtn.onclick = () => openLang(!langPop.classList.contains('open'));
+langGrid.onclick = e => { const b = e.target.closest('.lang-opt'); if (b) { st.loc = b.dataset.loc; render(); openLang(false); langBtn.focus(); } };
+langGrid.onkeydown = e => {
+  const o = opts(), i = o.indexOf(document.activeElement);
+  const cols = getComputedStyle(langGrid).gridTemplateColumns.split(' ').length;
+  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
+  if (step) { e.preventDefault(); o[(i + step + o.length) % o.length].focus(); }
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && langPop.classList.contains('open')) { openLang(false); langBtn.focus(); } });
+document.addEventListener('click', e => { if (!document.getElementById('lang').contains(e.target)) openLang(false); });
+document.getElementById('tabs').innerHTML = TABS.map(([t, n]) => `<button data-t="${t}">${n}</button>`).join('');
+document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (b) { st.tab = b.dataset.t; render(); } };
+render();
+</script></body></html>

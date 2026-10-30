@@ -220,13 +220,13 @@ dialog button{position:fixed;top:14px;right:18px;width:44px;height:44px;border-r
 </head>
 <body>
 <div class="wrap">
-<header class="top"><b>App Screenshots Pro Skill</b><a href="#install">Install</a><a href="${REPO}">GitHub</a></header>
+<header class="top"><b>App Screenshots Pro Skill</b><a href="samples/aptusfit/">Real app sample</a><a href="#install">Install</a><a href="${REPO}">GitHub</a></header>
 
 <div class="intro">
   <div>
     <h1>Store screenshots, rendered from your code</h1>
     <p class="lede">A Claude Code skill. Claude reads your app, writes the captions in every language you ship, and renders App Store and Google Play images at exact store sizes. Free, local and open source.</p>
-    <div class="cta"><a class="btn solid" href="#install">Install the plugin</a><a class="btn" href="${REPO}">View on GitHub</a></div>
+    <div class="cta"><a class="btn solid" href="#install">Install the plugin</a><a class="btn" href="${REPO}">View on GitHub</a><a class="btn" href="samples/aptusfit/">See a real app sample</a></div>
   </div>
   <div><p class="file">screenshots.config.json</p><pre>${highlightJson(d.snippet)}</pre></div>
 </div>
