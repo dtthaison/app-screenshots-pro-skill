@@ -39,23 +39,38 @@ export function reactionFrame(diffs, from, to, { threshold = REACT_MAD } = {}) {
 
 // commands[0] is the sync command. Others get t = the frame before their reaction
 // ('frame'), or the end of the command when nothing reacts in its window ('window').
-export function alignCommands(commands, diffs, fps, { slack = 0.5 } = {}) {
+export function alignCommands(commands, diffs, fps, { slack = 0.5, shiftRange = [-3, 1] } = {}) {
   const sync = findSync(diffs);
   if (sync == null) throw new Error('no full-screen change found for the sync step — does the first step open a different screen?');
   // Anchor on the sync command's END: its start-to-screen-change latency varies with app launch time (spike: about 30
   // frames of jitter between takes), while the change sits at a roughly fixed distance before the command returns
   // (about 4 frames of jitter).
-  const offsetMs = commands[0].startMs + commands[0].durMs - (sync * 1000) / fps;
+  const baseMs = commands[0].startMs + commands[0].durMs - (sync * 1000) / fps;
   // Adjacent windows can overlap, so a search starts after the sync frame and after the previous
   // command's reaction: neither can be claimed twice.
-  let last = sync;
-  const events = commands.map((c, i) => {
-    if (i === 0) return { ...c, t: sync / fps, align: 'frame' };
-    const from = (c.startMs - offsetMs) / 1000, end = (c.startMs + c.durMs - offsetMs) / 1000;
-    const r = reactionFrame(diffs, Math.max(Math.round(from * fps), last + 1), Math.round((end + slack) * fps));
-    if (r == null) return { ...c, t: end, align: 'window' };
-    last = r;
-    return { ...c, t: (r - 1) / fps, align: 'frame' };
-  });
-  return { offsetMs, events };
+  const place = (offsetMs) => {
+    let last = sync, hits = 0;
+    const events = commands.map((c, i) => {
+      if (i === 0) return { ...c, t: sync / fps, align: 'frame' };
+      const from = (c.startMs - offsetMs) / 1000, end = (c.startMs + c.durMs - offsetMs) / 1000;
+      const r = reactionFrame(diffs, Math.max(Math.round(from * fps), last + 1), Math.round((end + slack) * fps));
+      if (r == null) return { ...c, t: end, align: 'window' };
+      last = r; hits++;
+      return { ...c, t: (r - 1) / fps, align: 'frame' };
+    });
+    return { offsetMs, events, hits };
+  };
+  // A React Native app can change the screen well before openLink returns (AptusFIT coach: 1.2 s), which puts every
+  // window early. Fit one global shift, in frame steps, that aligns the most commands; nearest to 0 wins a tie. It must
+  // align 2 more than the anchor, so one stray change cannot move the clock.
+  const anchor = place(baseMs);
+  let best = { ...anchor, hits: anchor.hits + 1 }, shiftMs = 0;
+  for (let k = 1; k <= Math.round(Math.max(-shiftRange[0], shiftRange[1]) * fps); k++)
+    for (const s of [-k, k]) {
+      const ms = (s * 1000) / fps;
+      if (ms < shiftRange[0] * 1000 || ms > shiftRange[1] * 1000) continue;
+      const p = place(baseMs + ms);
+      if (p.hits > best.hits) { best = p; shiftMs = ms; }
+    }
+  return shiftMs ? { offsetMs: best.offsetMs, shiftMs, events: best.events } : { offsetMs: baseMs, shiftMs, events: anchor.events };
 }

@@ -310,12 +310,12 @@ export function startEncoder(ffmpeg, args) {
   };
 }
 
-// QA contact sheet: the frame nearest each whole second (max 30), 10 per row, 240 px high, second number underneath.
-export async function filmstrip(frames, out) {
+// QA contact sheet: the frame nearest every `step` seconds (max 30 tiles), 10 per row, 240 px high, second number underneath.
+export async function filmstrip(frames, out, step = 1) {
   const H = 240, GAP = 8, LABEL = 28, COLS = 10;
   const pick = [];
-  for (let k = 0; k < 30; k++) {
-    const f = frames.find((x) => x.t >= k && x.t < k + 1);
+  for (let i = 0; i < 30; i++) {
+    const k = i * step, f = frames.find((x) => x.t >= k && x.t < k + step);
     if (f) pick.push({ k, buf: f.buf });
   }
   if (!pick.length) throw new Error('filmstrip: no frames');

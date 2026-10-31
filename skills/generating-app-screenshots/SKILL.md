@@ -84,7 +84,7 @@ One JSON config → App Store / Play screenshots and app preview videos for ever
 | Preview videos | targets `preview-iphone` `preview-iphone-16-9` `preview-iphone-4.7` `preview-ipad` `preview-ipad-9.7` `preview-mac`: 15–30 s, max 3 per size and locale |
 | Creative assets | images `app-header` `search-asset` `event-card` `event-details` (+ `-16-9`, png only), videos `header-video` `search-video` `event-card-video` `event-details-video`: 1 per locale; wide slides need `"targets": ["creative"]` |
 | `previews` | `id targets music poster transition loop clipLocale byTarget scenes` — [config.md → previews](references/config.md#previews) |
-| Footage preview | `concept` (picks the checks), `record` (steps `open tap swipe type wait mark`), scene `clip: { from, to, speed: "auto" }`, `tap` (`ripple\|ring\|spotlight\|none`, default ripple), `captionMotion` (`rise\|words\|lines\|pop\|none`), `draft`, `moment`; `--check` — [config.md](references/config.md#real-footage-previews) |
+| Footage preview | `concept` (picks the checks), `record` (`boot`, steps `open tap swipe type wait mark`), scene `clip: { from, to, speed: "auto" }`, `tap` (`ripple\|ring\|spotlight\|none`, default ripple), `captionMotion` (`rise\|words\|lines\|pop\|none`), `draft`, `moment`; `--check` — [config.md](references/config.md#real-footage-previews) |
 | Footage layouts | `full-screen` (recording edge to edge, scrim caption), `caption-band` (solid band, screen below), `end-card` (icon, name, tagline) |
 | Mock screen states | `"screen": "screens/stats.html?state=before"` (query reaches the mock) |
 

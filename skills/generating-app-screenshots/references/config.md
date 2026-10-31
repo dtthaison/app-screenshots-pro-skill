@@ -437,6 +437,7 @@ A preview of real footage runs: **brief → `recommend.mjs` → storyboard (this
     "app": "ai.aptusfit.app",                   // bundle / application id
     "locales": { "ja": "ja_JP" },               // store locale -> app locale ({appLocale}); default: the same
     "setup": [ { "shell": "bash set-locale.sh {udid} {locale}" } ],   // {udid} {locale} {appLocale}; run in the config's folder
+    "boot": [ { "shell": "bash boot.sh {udid}" } ],                   // same fields; run after every terminate (rehearsal and each take)
     "steps": [
       { "open": "myapp://session", "wait": 6, "mark": "start" },
       { "tap": { "id": "set-done-4-0" }, "wait": 3, "mark": "log" },
@@ -466,8 +467,10 @@ A preview of real footage runs: **brief → `recommend.mjs` → storyboard (this
 | `wait` | seconds | On any step, after its action |
 | `mark` | a name | On an action step only. Names the time in the recording, so scenes can say `clip.from` / `clip.to` |
 
-Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is only allowed in `setup`. The record block is checked before anything runs, with these messages (verbatim):
-`record.steps is missing or empty` · `the first step must be an "open": it changes the whole screen, and that change is how the recording is synced to Maestro` · `step N: "shell" is only allowed in setup` · `step N: unknown key "k"` · `step N: has more than one of open, tap, swipe, type` · `step N: "tap" needs id, text or point` · `step N: "swipe" needs from and to` · `step N: tap.point "x" must be whole percents like "50%,80%" (Maestro rejects fractions)` · `mark "m" used twice` · `step N: mark "m" is on a wait-only step; put it on the action step it belongs to` · `setup step N: needs a "shell" string` · `record.app (the app id) is missing`.
+**`record.boot`** runs after the app is terminated, before the rehearsal and before each take. It is needed by an Expo dev client, which relaunches onto its launcher instead of the project, so deep links and taps would hit the wrong screen while point taps still pass the rehearsal (the take then fails with `0/2 taps aligned to a frame`). A boot script opens the dev-client URL, waits for the bundle, and presses Home so the first `open` still changes the whole screen.
+
+To dismiss the keyboard, `tap` a blank point of the screen and set `"tap": "none"` on the scene that shows it (Maestro's `hideKeyboard` failed on a React Native chat list). A network wait too long for the ramp (`clip span … needs …s with still stretches at 4×`) is left out between two scenes: end one before it and start the next after it, with marks or `clip.start`/`end` seconds read off the sheet; the report lists each scene's recording span. Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is only allowed in `setup` and `boot`. The record block is checked before anything runs, with these messages (verbatim):
+`record.steps is missing or empty` · `the first step must be an "open": it changes the whole screen, and that change is how the recording is synced to Maestro` · `step N: "shell" is only allowed in setup and boot` · `step N: unknown key "k"` · `step N: has more than one of open, tap, swipe, type` · `step N: "tap" needs id, text or point` · `step N: "swipe" needs from and to` · `step N: tap.point "x" must be whole percents like "50%,80%" (Maestro rejects fractions)` · `mark "m" used twice` · `step N: mark "m" is on a wait-only step; put it on the action step it belongs to` · `setup step N: needs a "shell" string` · `boot step N: needs a "shell" string` · `record.app (the app id) is missing`.
 
 **`record.mjs`**: `node scripts/record.mjs <config.json> --preview <id> [--udid U] [--locales a,b] [--takes 3]`. It needs Maestro 2.6+ (`maestro 2.6+ is needed to record: curl -Ls "https://get.maestro.mobile.dev" | bash`), `xcrun simctl`, exactly one booted simulator or `--udid`, and the app installed. Per locale it runs `setup`, sets the status bar to 9:41, rehearses every step (an element not found, or a system alert such as a permission prompt, is an ERROR and nothing is recorded), then films the take and writes `recordings/<locale>/<preview>.mov`, `.taps.json` and `.sheet.jpg` next to the config. With `--takes n` a failed take, or one where more than half the taps could not be aligned to a frame, is retried; a failed run leaves the previous recording, sidecar and sheet untouched. Exit 1 on any ERROR. `ASP_KEEP_TMP=1` keeps the temp folder.
 
@@ -539,7 +542,7 @@ Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is o
 | ERROR | `clip marks need <sidecar path> — record with record.mjs` | `clip.from`/`to` and no sidecar |
 | ERROR | `unknown mark "x" (marks: a, b)` · `mark "to" (1.2s) is not after "from" (3.4s)` | Bad marks |
 | ERROR | `clip.speed must be a number above 0 or "auto" (got "fast")` | |
-| ERROR | `clip span is 12.0s at 4× but scene "x" lasts 2.0s` | `speed: "auto"` with a `duration` too short even at 4× |
+| ERROR | `clip span is 12.0s and needs 5.0s with still stretches at 4×, but scene "x" lasts 2.0s` | `speed: "auto"` with a `duration` too short: only still stretches speed up, motion plays at 1× |
 | ERROR | `unknown tap "x" (ripple, ring, spotlight, none)` · `scene "x": unknown captionMotion "y" (rise, words, lines, pop, none)` | |
 | ERROR | `preview is 9s; preview-iphone wants 15–30s` | Total after ramping; still an ERROR |
 

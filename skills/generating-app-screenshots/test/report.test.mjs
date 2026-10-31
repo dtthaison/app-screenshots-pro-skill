@@ -42,3 +42,10 @@ test('handover lists only ramps that saved time, totals the printed values', () 
   assert.doesNotMatch(md, /- a:/); assert.match(md, /total: 2\.6s/);
   assert.match(handover({ preview: { id: 'p' }, locales: [], ramps: [{ scene: 'a', saved: 0 }], results: [] }), /Nothing was ramped/);
 });
+
+test('handover names the source span of each ramped scene, so trimmed waits are visible', () => {
+  const md = handover({ preview: { id: 'p' }, locales: ['en'], results: [],
+    ramps: [{ scene: 'ask', saved: 5.5, from: 37, to: 47.5 }, { scene: 'answer', saved: 10.4, from: 84, to: 101.3 }] });
+  assert.match(md, /- ask: recording 37\.0s - 47\.5s, 5\.5s saved by the speed ramp/);
+  assert.match(md, /- answer: recording 84\.0s - 101\.3s, 10\.4s saved by the speed ramp/);
+});

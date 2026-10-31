@@ -4,7 +4,7 @@ import { timeCode } from './video.mjs';
 const secs = (n) => `${Number(n).toFixed(1)}s`;
 
 // results: [{ tag, file, length, posterTime, warnings: count, beats?: [{ id, start, end }] }]  (one per target x locale)
-// ramps: [{ scene, saved }] (speed "auto" scenes only); moments: network moment ids to accept; drafts: draft scene ids
+// ramps: [{ scene, saved, from?, to? }] (speed "auto" scenes only; from/to: the recording span, seconds); moments: network moment ids to accept; drafts: draft scene ids
 export function handover({ preview, concept, results = [], ramps = [], warnings = [], notes = [], locales = [], beats, moments = [], drafts = [] }) {
   const out = [`# ${preview.id}`, ''];
   if (concept) out.push(`Concept: ${concept}`, '');
@@ -16,9 +16,10 @@ export function handover({ preview, concept, results = [], ramps = [], warnings 
   for (const r of results) out.push(`| ${r.file} | ${secs(r.length)} | ${timeCode(r.posterTime, r.fps)} | ${r.warnings ? `${r.warnings} WARN` : 'clean'} |`);
 
   out.push('', '## Cut', '');
-  const cut = ramps.map((r) => ({ scene: r.scene, saved: Number(r.saved.toFixed(1)) })).filter((r) => r.saved > 0);   // total adds up the printed values
+  const cut = ramps.map((r) => ({ ...r, saved: Number(r.saved.toFixed(1)) })).filter((r) => r.saved > 0);   // total adds up the printed values
   if (cut.length) {
-    for (const r of cut) out.push(`- ${r.scene}: ${secs(r.saved)} saved by the speed ramp`);
+    // the span shows what the clip trimmed, e.g. a network wait left out between two scenes
+    for (const r of cut) out.push(`- ${r.scene}: ${r.from != null ? `recording ${secs(r.from)} - ${secs(r.to)}, ` : ''}${secs(r.saved)} saved by the speed ramp`);
     out.push(`- total: ${secs(cut.reduce((a, r) => a + r.saved, 0))} saved`);
   } else out.push('Nothing was ramped or cut.');
 

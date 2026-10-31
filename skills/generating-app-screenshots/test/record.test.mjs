@@ -14,10 +14,12 @@ test('validateRecord: missing steps, unknown keys, shell outside setup, marks on
   assert.match(validateRecord({}).join(), /steps is missing or empty/);
   assert.match(validateRecord({ steps: [] }).join(), /steps is missing or empty/);
   assert.match(validateRecord({ steps: [{ open: 'x://a', bogus: 1 }] }).join(), /unknown key "bogus"/);
-  assert.match(validateRecord({ steps: [{ open: 'x://a' }, { shell: 'ls' }] }).join(), /"shell" is only allowed in setup/);
+  assert.match(validateRecord({ steps: [{ open: 'x://a' }, { shell: 'ls' }] }).join(), /"shell" is only allowed in setup and boot/);
   assert.match(validateRecord({ steps: [{ open: 'x://a' }, { wait: 1, mark: 'z' }] }).join(), /wait-only step/);
   assert.match(validateRecord({ steps: [{ open: 'x://a' }, { tap: { point: '50%,46.5%' } }] }).join(), /whole percents/);
   assert.deepEqual(validateRecord({ setup: [{ shell: 'true' }], steps: [{ open: 'x://a' }] }), []);
+  assert.match(validateRecord({ boot: [{ open: 'x' }], steps: [{ open: 'x://a' }] }).join(), /boot step 1: needs a "shell" string/);
+  assert.deepEqual(validateRecord({ boot: [{ shell: 'true' }], steps: [{ open: 'x://a' }] }), []);
 });
 test('substitute fills udid, locale, appLocale', () =>
   assert.equal(substitute('s.sh {udid} {locale} {appLocale}', { udid: 'U', locale: 'en-US', appLocale: 'en-SG' }), 's.sh U en-US en-SG'));
