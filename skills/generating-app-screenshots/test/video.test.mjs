@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning } from '../scripts/video.mjs';
+import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, clipArgs, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning } from '../scripts/video.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'asp-video-'));
@@ -199,6 +199,32 @@ test('probeClip and extractClip on a generated test clip', { skip: !findFfmpeg()
     const x = extractClip(ff, { file: clip, start: 0.5, end: 1.5, speed: 1, height: 320, dir });
     assert.equal(x.count, 30); assert.ok(fs.existsSync(x.files[29]));
     assert.equal(extractClip(ff, { file: clip, start: 0.5, end: 1.5, speed: 1, height: 320, dir }).count, 30); // cached
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+test('clipArgs cuts on the full-decode timeline: no input seek, trim after fps', () => {
+  // On a simctl .mov (ffmpeg 6.0) `-ss` before `-i` labelled frames after a 7 s still gap 7 s late; record.mjs times marks
+  // on a full decode, so render cuts with trim on that same timeline.
+  const a = clipArgs({ file: 'in.mov', start: 40.5, end: 44.25, speed: 1, height: 480, out: 'o/%05d.jpg' });
+  assert.ok(!a.includes('-ss') && !a.includes('-to'), a.join(' '));
+  // presentation times, not ffmpeg's dts-based guess: on a simctl take the guess put 987 of 2815 frames up to 3.4 s off
+  // AVFoundation's timestamps; ignoring dts matched every frame within 1 ms
+  assert.deepEqual(a.slice(a.indexOf('-fflags'), a.indexOf('-fflags') + 3), ['-fflags', '+igndts', '-i']);
+  assert.equal(a[a.indexOf('-vf') + 1], 'fps=30,trim=start=40.5:end=44.25,setpts=PTS-STARTPTS,scale=-2:480');
+  assert.equal(clipArgs({ file: 'in.mov', start: 0, speed: 2, out: 'x' })[clipArgs({ file: 'in.mov', start: 0, speed: 2, out: 'x' }).indexOf('-vf') + 1],
+    'fps=30,trim=start=0,setpts=PTS-STARTPTS,setpts=PTS/2,fps=30');
+});
+test('extractClip frames match the same frames of a whole-file extraction (record and render share one clock)', { skip: !findFfmpeg() }, () => {
+  const ff = findFfmpeg(), d = tmp();
+  try {
+    const clip = path.join(d, 'gap.mov');
+    // a variable-frame-rate recording with a 3 s still gap, like a simulator take
+    const r = spawnSync(ff, ['-f', 'lavfi', '-i', "color=c=black:s=64x64:r=60:d=6,geq=lum='mod(N*3\\,250)':cb=128:cr=128,select='not(between(t\\,1\\,4))'",
+      '-fps_mode', 'vfr', '-c:v', 'libx264', '-bf', '3', '-pix_fmt', 'yuv420p', '-video_track_timescale', '600', '-y', clip], { stdio: 'pipe' });
+    assert.equal(r.status, 0, String(r.stderr));
+    const whole = extractClip(ff, { file: clip, height: 64, dir: path.join(d, 'all') });
+    const cut = extractClip(ff, { file: clip, start: 3.5, end: 4.5, speed: 1, height: 64, dir: path.join(d, 'cut') });
+    assert.equal(cut.count, 30);
+    for (const i of [0, 15, 29]) assert.deepEqual(fs.readFileSync(cut.files[i]), fs.readFileSync(whole.files[105 + i]), `frame ${i}`);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
 test('startEncoder writes a valid mp4', { skip: !findFfmpeg() }, async () => {
