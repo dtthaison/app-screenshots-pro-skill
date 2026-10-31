@@ -98,7 +98,7 @@ Tuned on a spike against a real simulator. Both are mean absolute differences be
 |---|---|---|
 | `SYNC_MAD = 8` | in `scripts/align.mjs` | a frame-to-frame change that counts as the full-screen sync flash. It was 30. At 30 the sync was found 6 frames late in the spike |
 | `REACT_MAD = 3` | in `scripts/align.mjs` | a change that counts as a tap reaction inside the tap command's window |
-| `IDLE_MAD = 1.5` | in `scripts/ramp.mjs` | a frame-to-frame change under which a frame is idle; a run of at least 0.5 s plays up to 4×. On `walk.mp4` the still tail is 0-0.7 (encoder noise) and motion starts at 1.2+. AptusFIT tuning follows in Task 13 |
+| `IDLE_MAD = 1.5` | in `scripts/ramp.mjs` | a frame-to-frame change under which a frame is idle; a run of at least 0.5 s plays up to 4×. On `walk.mp4` the still tail is 0-0.7 (encoder noise) and motion starts at 1.2+. re-tune on a real app recording |
 
 How the timeline is aligned:
 - The sync is anchored on the end of the opening `openLink` command, not its start. This cut the Maestro-to-video jitter

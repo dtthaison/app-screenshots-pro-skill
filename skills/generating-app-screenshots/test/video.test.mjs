@@ -102,7 +102,19 @@ test('checkDuration against target.video', () => {
 });
 test('timeCode', () => {
   assert.equal(timeCode(5), '00:00:05:00');
-  assert.equal(timeCode(65.5), '00:01:05:50');
+  assert.equal(timeCode(65.5), '00:01:05:15');
+  assert.equal(timeCode(5.5), '00:00:05:15');
+  assert.equal(timeCode(59.99), '00:01:00:00');
+  assert.equal(timeCode(3599.99), '01:00:00:00');
+  assert.equal(timeCode(4.1, 24), '00:00:04:02');
+});
+test('stateAt: ms-rounded scene starts do not lag the clip frame index', () => {
+  const tl = buildTimeline({}, [{ id: 'a', duration: 2.0667, in: 'none' }, { id: 'c', duration: 3, in: 'none', clip: { frames: 90, fps: 30 } }]);
+  const exact = 2.0667;
+  for (const t of [2.51, 3.02, 3.31, 4.01, 4.45]) {
+    const want = Math.floor((t - exact) * 30);
+    assert.equal(stateAt(tl, t).scenes[1].screen.frame, want, `t=${t}`);
+  }
 });
 test('scroll keeps scroll from 2% overflow, drifts below', () => {
   const tl = buildTimeline({}, [{ id: 'a', motion: 'scroll', overflow: 0.03 }, { id: 'b', motion: 'scroll', overflow: 0.015 }]);

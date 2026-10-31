@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isStillImagePath, framedDevice, priceMatch, timeSensitive, playPhrase, readingTime, conceptWarnings, iphoneOnly, storeChecks } from '../scripts/storecheck.mjs';
+import { buildTimeline } from '../scripts/video.mjs';
 
 test('price patterns across locales', () => {
   for (const s of ['Just $9.99', '9,99 €/Monat', '¥1,000', '99.000₫/tháng', '月額500円/月', 'RM 12', 'Rp15.000', 'R$ 9', '9 USD', 'EUR 5', '$5/yr', '4 € /mois', '每月 ¥9/年', '500円/月', '9 /week']) assert.ok(priceMatch(s), s);
@@ -71,4 +72,12 @@ test('hook timing includes the entrance delay', () => {
 test('draft must be a still image path', () => {
   for (const p of ['screens/a.png', 'screens/{locale}/a.JPG', 'a.webp']) assert.ok(isStillImagePath(p), p);
   for (const p of ['a.mov', 'a.mp4', 'a.html', 'a', undefined]) assert.ok(!isStillImagePath(p), String(p));
+});
+test('reading time counts the next transition and the entrance', () => {
+  const tl = buildTimeline({}, [{ id: 'a', duration: 2.2, words: 5 }, { id: 'b', duration: 3, transition: { kind: 'crossfade', dur: 0.5 } }]);
+  const run = (t) => storeChecks({ target: { id: 'preview-iphone', store: 'ios' }, locale: 'en', preview: {}, timeline: t,
+    scenes: [{ id: 'a', layout: 'caption-band', dev: { model: 'none', style: 'frameless' }, texts: [], hasCaption: true }, { id: 'b', layout: 'caption-band', dev: { model: 'none', style: 'frameless' }, texts: [], hasCaption: false }] }).warnings.filter((x) => /need .* to read/.test(x));
+  assert.equal(run(tl).length, 1);
+  const longer = buildTimeline({}, [{ id: 'a', duration: 6, words: 5 }, { id: 'b', duration: 3, transition: { kind: 'crossfade', dur: 0.5 } }]);
+  assert.equal(run(longer).length, 0);
 });

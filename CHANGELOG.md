@@ -14,6 +14,7 @@
 - Example `examples/preview-recorded` (`npm run example:preview-recorded`) renders without a simulator. `examples/preview/recordings/en-US/walk.taps.json` is a hand-written sidecar, so the `stats` scene of `examples/preview` (on `walk.mp4`) now shows tap ripples by default.
 - `examples/preview` shows one expected WARN for `preview-ipad`, `caption-band: the screen is only 50% of the canvas width`, because this release is iPhone-first.
 - `evals/evals.json`: 4 skill evals for the recommend and storyboard steps.
+- Upgrade note: existing 1.1.0 preview configs that show device frames on `preview-*` targets now get the WARN `device frames risk rejection under 2.3.4 — use full-screen or caption-band` for each framed scene. Fix: switch those scenes to `full-screen` or `caption-band`.
 - Docs: `references/reading-the-app.md` §2b is rewritten around `record.mjs` (moments, deep links, test IDs), and `references/config.md` documents every new field and message.
 
 ## 1.1.0 (2026-10-30)

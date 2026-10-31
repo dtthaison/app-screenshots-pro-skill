@@ -3,7 +3,7 @@
 // Pure; the diffs come from align.mjs frameDiffs.
 
 // walk.mp4 (880x1912, 30 fps): the still tail's frames differ by 0-0.7 (alternating 0.7 / 0.1, encoder noise) while any
-// motion starts at 1.2 and above, so 1.5 sits 2x over the noise. Starting value; AptusFIT tuning follows in Task 13.
+// motion starts at 1.2 and above, so 1.5 sits 2x over the noise. Starting value; Re-tune on a real app recording.
 export const IDLE_MAD = 1.5;
 
 // Source frame ranges [from, to) that stay still for at least minSec. d[0] is 0 by definition and never counts.
