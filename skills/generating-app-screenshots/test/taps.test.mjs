@@ -100,3 +100,9 @@ test('markSpan: a mark can carry an offset in seconds ("log+1.5", "swap-0.4")', 
   assert.throws(() => markSpan(sc, 'nope+1', undefined, 20), /unknown mark "nope"/);
   assert.throws(() => markSpan(sc, 'log+9', 'swap', 20), /mark "swap" \(8.95s\) is not after "log\+9" \(12.2s\)/);
 });
+test('markSpan: a mark whose own name ends in -<number> is found by its whole name before an offset is split off', () => {
+  const s = { ...sc, marks: { 'tab-2': 4, 'tab': 1, next: 9 } };
+  assert.deepEqual(markSpan(s, 'tab-2', undefined, 20), { start: 4, end: 9 });
+  assert.deepEqual(markSpan(s, 'tab-2+1', 'next-0.5', 20), { start: 5, end: 8.5 });
+  assert.deepEqual(markSpan(s, 'tab+0.5', 'tab-2', 20), { start: 1.5, end: 4 });
+});

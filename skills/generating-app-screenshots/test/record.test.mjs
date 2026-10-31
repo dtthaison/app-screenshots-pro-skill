@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateRecord, substitute, writeTake, deviceClass, buildSidecar, takeCommands, processTake } from '../scripts/record.mjs';
+import { validateRecord, substitute, writeTake, deviceClass, buildSidecar, takeCommands, processTake, keyboardRestoreArgs } from '../scripts/record.mjs';
 
 test('validateRecord: first step must open', () => {
   assert.match(validateRecord({ steps: [{ tap: { id: 'a' } }] }).join(), /first step must be an "open"/);
@@ -76,4 +76,16 @@ test('processTake: an unreadable take is a failed take, not a crash', async () =
   assert.equal(r.ok, false);
   assert.match(r.log, /could not process the take/);
   fs.rmSync(dir, { recursive: true });
+});
+test('validateRecord: malformed steps and waits get messages, not a TypeError or a NaN timeout', () => {
+  assert.match(validateRecord({ steps: [null] }).join(), /step 1: must be an object/);
+  assert.match(validateRecord({ steps: [{ open: 'x://a' }, 'tap'] }).join(), /step 2: must be an object/);
+  for (const wait of ['2', -1, NaN]) assert.match(validateRecord({ steps: [{ open: 'x://a', wait }] }).join(), /step 1: wait must be a number of seconds, 0 or more/);
+  assert.deepEqual(validateRecord({ steps: [{ open: 'x://a', wait: 0 }, { tap: { id: 'b' }, wait: 2.5 }] }), []);
+});
+test('keyboardRestoreArgs puts the Simulator hardware-keyboard default back as it was before the recording', () => {
+  const k = ['com.apple.iphonesimulator', 'ConnectHardwareKeyboard'];
+  assert.deepEqual(keyboardRestoreArgs({ status: 1, stdout: '' }), ['delete', ...k]);            // was unset
+  assert.deepEqual(keyboardRestoreArgs({ status: 0, stdout: '1\n' }), ['write', ...k, '-bool', 'true']);
+  assert.deepEqual(keyboardRestoreArgs({ status: 0, stdout: '0\n' }), ['write', ...k, '-bool', 'false']);
 });

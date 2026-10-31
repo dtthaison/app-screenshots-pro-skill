@@ -2,7 +2,7 @@
 // Render store screenshots from screenshots.config.json with headless Chromium.
 // Usage: node render.mjs <config.json> [--out dir] [--locales en-US,vi] [--targets ios-6.9,ipad-13]
 //                       [--slides id1,id2] [--format png|jpeg|webp] [--fastlane] [--no-preview]
-//                       [--previews id1,id2] [--scenes id1,id2] [--no-previews] [--only-previews] [--check] [--supersample n]
+//                       [--previews id1,id2] [--scenes id1,id2] [--no-previews] [--only-previews] [--check] [--supersample n] [--video-supersample n]
 // --no-preview skips the QA contact sheets and index.html; --no-previews skips the app preview (video) pass.
 // --check runs every preview validation (and the store checks) without capturing frames; it implies --only-previews.
 
@@ -22,7 +22,7 @@ import { idleRuns, rateCurve, frameMap, linearMap, fitMap, outputFrame } from '.
 import { sidecarPath, readSidecar, markSpan, tapsInSpan, activityInSpan, tapColor, TAP_FX, resolveTap } from './taps.mjs';
 import { handover, forPreview, networkMoments } from './report.mjs';
 import { storeChecks, iphoneOnly, isStillImagePath } from './storecheck.mjs';
-import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
+import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, captureScale, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning, DEFAULT_DURATION } from './video.mjs';
 
 // ---------- CLI ----------
 const argv = process.argv.slice(2);
@@ -64,8 +64,9 @@ function layer(base, top) {
 }
 const theme = (() => { const { preset, ...rest } = cfg.theme || {}; return layer(presetTheme(preset), rest); })();
 const SUPERSAMPLE = Number(flag('supersample', cfg.supersample ?? 2));
-// app previews render at 1x by default (capture speed); clips are extracted at the screen height this gives
-const VIDEO_SCALE = Number(flag('supersample', cfg.videoSupersample ?? 1));
+// app previews render at 1x by default (capture speed) and have their own flag: --supersample is for stills only, as a
+// 3x video capture is several times slower. Clips are extracted at the screen height this gives
+const VIDEO_SCALE = Number(flag('video-supersample', cfg.videoSupersample ?? 1));
 const warnings = [];
 const notes = [];
 const errors = [];
@@ -859,7 +860,7 @@ async function renderPreviews(browser, jobs, ffmpeg) {
     const music = typeof preview.music === 'string' ? { src: preview.music } : preview.music;
     if (music && !fs.existsSync(abs(music.src))) { errors.push(`[${tag}] music not found: ${music.src}`); continue; }
     // renderScale (custom video targets, or byTarget on the preview) renders smaller and lets ffmpeg upscale
-    const rs = Number(preview.renderScale ?? t.renderScale ?? 1), scale = VIDEO_SCALE * rs;
+    const rs = Number(preview.renderScale ?? t.renderScale ?? 1), scale = captureScale(VIDEO_SCALE * rs, W, H);
     if (rs !== 1) notes.push(`[${tag}] rendered at ${rs}× — drafts only`);
     const html = path.join(OUT, '.build', `preview.${slug}.${locale}.${preview.id}.html`);
     fs.writeFileSync(html, previewPage(job));

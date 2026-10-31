@@ -60,9 +60,12 @@ const DESK_WIDE = ['text-top', 'hero', 'device-hero', 'tilt-left', 'tilt-right',
 const WIDE_OK = ['phone-watch', 'laptop-phone', 'caption-top', 'text-left', 'text-right', 'caption-only', 'blank', 'frameless', 'feature-grid', 'steps', 'stats', 'review', 'awards', 'landscape', 'mosaic', 'full-screen', 'caption-band', 'end-card'];
 
 // A background (string, {color}, {gradient:{stops}}) as one solid CSS colour. Only a trailing position ("0%") is stripped
-// from a stop, so "rgba(1, 2, 3, .5) 0%" survives.
+// from a stop, so "rgba(1, 2, 3, .5) 0%" survives. A CSS gradient string gives its first colour, an image the fallback.
 export function solidBackground(bg, fallback = '#000') {
-  if (typeof bg === 'string') return bg;
+  if (typeof bg === 'string') {
+    if (!/gradient|url\(/i.test(bg)) return bg;
+    return /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^)]*\)/i.exec(bg.replace(/url\([^)]*\)/gi, ''))?.[0] ?? fallback;
+  }
   if (bg?.color) return bg.color;
   const stop = bg?.gradient?.stops?.[0];
   if (typeof stop === 'string') return stop.replace(/\s+-?[\d.]+(%|px)?$/, '').trim() || fallback;
