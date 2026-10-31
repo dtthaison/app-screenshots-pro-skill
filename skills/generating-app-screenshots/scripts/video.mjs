@@ -98,7 +98,8 @@ export function stateAt(tl, t) {
 
       const p = prog(t, s.start, s.duration);
       // a speed-ramped clip carries a map (output frame -> source frame); otherwise one source frame per output frame
-      const k = s.clip ? Math.max(0, Math.floor((t - s.start) * s.clip.fps)) : 0;
+      // starts are rounded to whole ms, so nudge by 1 ms to keep the frame index from lagging one frame
+      const k = s.clip ? Math.max(0, Math.floor((t - s.start) * s.clip.fps + 1e-3 * s.clip.fps)) : 0;
       const frame = !s.clip ? null : s.clip.map ? s.clip.map[Math.min(s.clip.map.length - 1, k)] : Math.min(s.clip.frames - 1, k);
       return {
         id: s.id, visible, opacity, tx, veil,
@@ -157,9 +158,12 @@ export function checkDuration(tl, target, { sceneFilter = false } = {}) {
   return [`preview is ${secs(tl.total)}; ${target.id} wants ${range}`];
 }
 
-export const timeCode = (s) => {
-  const cs = Math.round(s * 100), p = (n) => String(n).padStart(2, '0');
-  return `${p(Math.floor(cs / 360000))}:${p(Math.floor(cs / 6000) % 60)}:${p(Math.floor(cs / 100) % 60)}:${p(cs % 100)}`;
+// HH:MM:SS:FF, the last field in frames (App Store Connect's preview_frame_time_code)
+export const timeCode = (s, fps = 30) => {
+  const p = (n) => String(n).padStart(2, '0');
+  const f = Math.max(1, Math.round(fps)), total = Math.round(s * f);   // whole frames; the carry into seconds falls out of the division
+  const sec = Math.floor(total / f);
+  return `${p(Math.floor(sec / 3600))}:${p(Math.floor(sec / 60) % 60)}:${p(sec % 60)}:${p(total % f)}`;
 };
 
 // byTarget.scenes: ["a", "b"] picks (and orders) the preview's own scenes by id; scene objects replace them.

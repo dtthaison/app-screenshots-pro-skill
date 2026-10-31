@@ -13,7 +13,7 @@ export function handover({ preview, concept, results = [], ramps = [], warnings 
   if (bs.length) out.push('');
 
   out.push('## Files', '', '| File | Length | preview_frame_time_code | Checks |', '| --- | --- | --- | --- |');
-  for (const r of results) out.push(`| ${r.file} | ${secs(r.length)} | ${timeCode(r.posterTime)} | ${r.warnings ? `${r.warnings} WARN` : 'clean'} |`);
+  for (const r of results) out.push(`| ${r.file} | ${secs(r.length)} | ${timeCode(r.posterTime, r.fps)} | ${r.warnings ? `${r.warnings} WARN` : 'clean'} |`);
 
   out.push('', '## Cut', '');
   const cut = ramps.map((r) => ({ scene: r.scene, saved: Number(r.saved.toFixed(1)) })).filter((r) => r.saved > 0);   // total adds up the printed values

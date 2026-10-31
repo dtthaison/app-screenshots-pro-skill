@@ -909,7 +909,7 @@ async function renderPreviews(browser, jobs, ffmpeg) {
       fs.mkdirSync(path.dirname(strip), { recursive: true });
       await filmstrip(frames, strip);
     }
-    console.log(`  ${tag}: ${tl.total.toFixed(1)}s video in ${Math.round(secs)}s → ${path.relative(OUT, file)} (poster ${timeCode(pt.time)})`);
+    console.log(`  ${tag}: ${tl.total.toFixed(1)}s video in ${Math.round(secs)}s → ${path.relative(OUT, file)} (poster ${timeCode(pt.time, fps)})`);
     done.push({ job, tag, index, file, poster, posterTime: pt.time, posterWarnings: pt.warnings, filmstrip: strip, stills: !job.scenes.some((e) => e.clip) });
   }
   for (const p of Object.values(pages)) await p.close();
@@ -1246,9 +1246,9 @@ async function main() {
       fs.copyFileSync(p.file, dest);
     }
     // deliver sets one poster time (preview_frame_time_code, default 5 s) for the whole upload
-    const codes = [...new Set(shipped.filter((p) => p.job.target.asc).map((p) => timeCode(p.posterTime)))];
+    const codes = [...new Set(shipped.filter((p) => p.job.target.asc).map((p) => timeCode(p.posterTime, p.job.timeline.fps)))];
     if (codes.length > 1) warn(`previews in this run have different poster times (${codes.join(', ')}) — deliver takes one preview_frame_time_code for the whole upload`);
-    const code = codes.find((c) => c !== timeCode(5));
+    const code = shipped.filter((p) => p.job.target.asc).map((p) => timeCode(p.posterTime, p.job.timeline.fps)).find((c, i, all) => c !== timeCode(5, shipped.filter((q) => q.job.target.asc)[i].job.timeline.fps));
     if (code) notes.push(`deliver: pass preview_frame_time_code "${code}"`);
   }
 
@@ -1319,7 +1319,7 @@ figcaption{display:flex;justify-content:space-between;gap:8px;margin-top:8px;fon
       fs.mkdirSync(rdir, { recursive: true });
       const mine = shipped.filter((p) => p.job.preview.id === id), first = mine[0].job;   // ramps depend on the clip, not on caption or locale, so Cut and the beats come from the first job
       const pw = forPreview(warnings, id), pn = forPreview(notes, id);
-      const results = mine.map((p) => ({ tag: p.tag, file: path.relative(process.cwd(), p.file), length: p.job.timeline.total, posterTime: p.posterTime,
+      const results = mine.map((p) => ({ tag: p.tag, file: path.relative(process.cwd(), p.file), length: p.job.timeline.total, posterTime: p.posterTime, fps: p.job.timeline.fps,
         warnings: new Set(pw.filter((w) => w.startsWith(`[${p.tag}`))).size }));
       const beats = first.timeline.scenes.map((s) => ({ id: s.id, start: s.start, end: s.end }));
       const md = handover({ preview: first.preview, concept: first.preview.concept, results, beats, ramps: first.ramps, warnings: [...new Set(pw)], notes: [...new Set(pn)],

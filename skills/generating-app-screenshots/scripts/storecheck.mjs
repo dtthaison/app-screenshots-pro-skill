@@ -2,7 +2,7 @@
 // references/video/store-rules.md ("Enforcing checks"), with its level and the targets it applies to.
 // Levels never change the exit code except ERROR: WARN and NOTE exit 0.
 import { CONCEPTS } from './concepts.mjs';
-import { motionLength, splitWords, wordCount } from './kinetic.mjs';
+import { splitWords, wordCount } from './kinetic.mjs';
 import { restLen } from './video.mjs';
 
 const EPS = 1e-6;
@@ -120,7 +120,9 @@ export function storeChecks({ target, locale, preview, scenes, timeline, disclos
       t(timeSensitive(text, locale), notes);
     }
     if (sc.hasCaption && tl) {
-      const need = readingTime(tl.words), shown = tl.duration - motionLength(tl.captionMotion, tl.words);
+      const need = readingTime(tl.words), nextDur = timeline.scenes[i + 1]?.transition?.dur ?? 0;
+      // same model as the hook check: the caption is at rest from visibleAt and the next transition starts covering it at end - nextDur
+      const visibleAt = Math.max(tl.start, tl.start - (tl.transition?.dur ?? 0) + restLen(tl)), shown = (tl.end - nextDur) - visibleAt;
       if (shown < need - EPS) warnings.push(`${at}: caption is fully visible for ${shown.toFixed(1)}s but ${tl.words} words need ${need.toFixed(1)}s to read`);
     }
     for (const l of tl?.labels ?? []) {

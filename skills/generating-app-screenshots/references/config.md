@@ -420,7 +420,7 @@ The example's three tweaks are specific to its content; do not copy them blindly
 
 ### Poster frame
 
-App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest, kept inside the scene and before the next scene starts covering it). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:10"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
+App Store Connect picks the poster by **time**, not by file. `poster` is seconds (default 5, the App Store Connect default) or a scene id (the first frame where that scene is at rest, kept inside the scene and before the next scene starts covering it). The renderer writes `NN_<id>.poster.png` at that time as a reference and WARNs when the time falls inside a transition, an entrance or the loop fade (`poster 5.00s falls inside the entrance of scene "stats"`). Scene 1 and the poster carry the hook: the poster is what shoppers see before the video plays. When the time is not 5 s, the report prints `NOTE deliver: pass preview_frame_time_code "00:00:04:03"`; `deliver` takes one code for the whole upload, so previews with different poster times in one run WARN.
 
 ### Real footage previews
 
@@ -494,7 +494,7 @@ Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is o
 
 **Draft, then record.** The same entry renders as a draft first: scenes whose recording is missing use their `draft` still and the run says so (NOTE below). After `record.mjs` writes the recording nothing in the config changes.
 
-**`--check`**: `node scripts/render.mjs <config.json> --check` runs every validation of the previews (scene resolution, clip spans, ramps, tap alignment, the store-rule and concept checks) and prints WARN, NOTE and ERROR lines without capturing a frame or writing a file. It implies `--only-previews` and ends with `checked N previews (no frames captured)`. Exit codes as usual: 0, 1 (ERROR), 2 (crash). Run it on the storyboard before recording and again before the final render.
+**`--check`**: `node scripts/render.mjs <config.json> --check` runs every validation of the previews (scene resolution, clip spans, ramps, tap alignment, the store-rule and concept checks) and prints WARN, NOTE and ERROR lines without capturing a frame or encoding a video. It still writes `.build/preview.*.html` and extracts the clip frames it needs into the cache. It implies `--only-previews` and ends with `checked N previews (no frames captured)`. Exit codes as usual: 0, 1 (ERROR), 2 (crash). Run it on the storyboard before recording and again before the final render.
 
 **`preview-brief.json`** sits next to the config and is read by `recommend.mjs` and (for `owner.disclose` and the network moments of the hand-over) by `render.mjs`:
 
