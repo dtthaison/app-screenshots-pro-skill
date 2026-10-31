@@ -91,3 +91,12 @@ test('tapsInSpan: a tap at the span start counts, one at the end does not', () =
   const o = { events: [{ t: 2, kind: 'tap', x: 0.5, y: 0.5 }, { t: 5, kind: 'tap', x: 0.5, y: 0.5 }, { t: 4.999, kind: 'tap', x: 0.5, y: 0.5 }] };
   assert.deepEqual(tapsInSpan(o, 2, 5).map((e) => e.srcT), [2, 4.999]);
 });
+
+test('markSpan: a mark can carry an offset in seconds ("log+1.5", "swap-0.4")', () => {
+  assert.deepEqual(markSpan(sc, 'log+1.5', 'swap-0.45', 20), { start: 4.7, end: 8.5 });
+  assert.deepEqual(markSpan(sc, 'start+0.4', undefined, 20), { start: 1.5, end: 3.2 });   // next mark after the shifted start
+  assert.deepEqual(markSpan(sc, 'log-0.5', undefined, 20), { start: 2.7, end: 8.95 });    // not 'log' itself: the next mark after it
+  assert.deepEqual(markSpan(sc, 'swap-0.5', undefined, 20), { start: 8.45, end: 20 });
+  assert.throws(() => markSpan(sc, 'nope+1', undefined, 20), /unknown mark "nope"/);
+  assert.throws(() => markSpan(sc, 'log+9', 'swap', 20), /mark "swap" \(8.95s\) is not after "log\+9" \(12.2s\)/);
+});

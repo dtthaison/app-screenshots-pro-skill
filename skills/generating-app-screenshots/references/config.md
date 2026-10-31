@@ -461,7 +461,7 @@ A preview of real footage runs: **brief → `recommend.mjs` → storyboard (this
 | Step | Fields | Notes |
 |---|---|---|
 | `open` | a URL | Opens a deep link in the take (Maestro `openLink`), so it lands in the same timeline as the taps |
-| `tap` | `{ "id": "..." }`, `{ "text": "..." }` or `{ "point": "50%,80%" }` | `id`/`text` are looked up in the rehearsal (`maestro hierarchy`) and stored as a box |
+| `tap` | `{ "id": "..." }`, `{ "text": "..." }` or `{ "point": "50%,80%" }` | `id`/`text` are looked up in the rehearsal (`maestro hierarchy`) and stored as a box. A `text` on screen can still be "not found" when the app merges it into a parent's label (a card read as `UPPER, 60 MIN, Start Workout`) or draws it in a native sheet: tap its `point` |
 | `swipe` | `{ "from": "50%,70%", "to": "50%,30%", "ms": 400 }` | `ms` optional |
 | `type` | a string | Maestro `inputText`, typed character by character; recorded as one `type` event |
 | `wait` | seconds | On any step, after its action |
@@ -480,7 +480,7 @@ To dismiss the keyboard, `tap` a blank point of the screen and set `"tap": "none
 
 | Field | Values | Meaning |
 |---|---|---|
-| `clip.from` / `clip.to` | mark names of the sidecar | The part of the recording to show. `from` defaults to the start of the file; `to` to the next mark after `from`, else the end. Cannot be combined with `clip.start`/`clip.end` |
+| `clip.from` / `clip.to` | mark names of the sidecar, optionally with an offset in seconds (`"start+2"`, `"swap-0.5"`) | The part of the recording to show. `from` defaults to the start of the file; `to` to the next mark after `from`, else the end. A mark sits on its tap, so use an offset to start once a loading screen has cleared or to end before the next screen slides in. Cannot be combined with `clip.start`/`clip.end` |
 | `clip.speed` | a number above 0, or `"auto"` | `"auto"` plays idle stretches faster (never below 1×, at most 4×, 300 ms smoothstep edges) and keeps 0.4 s before and 0.8 s after every tap or swipe at 1×. Without `duration` the scene is as long as the ramped span; with `duration` the smallest top speed that fits is used. It needs only frames, so it works without a sidecar |
 | `tap` | `ripple`, `ring`, `spotlight`, `none` | Effect drawn at each tap and swipe of the sidecar. Effective value: `scene.tap ?? preview.tap ?? theme.video.tap ?? "ripple"`, so taps are on by default; `"none"` turns them off. Ripple: radius 3% to 12% of the screen width over 600 ms. Ring: same timing, 3 px stroke. Spotlight: dims the rest, with a cut-out 18% of the screen width wide (fade in 200 ms, hold 600 ms, fade out 300 ms). Values: `references/video/motion.md#tap-effects` |
 | `captionMotion` | `rise`, `words`, `lines`, `pop`, `none` | How the caption enters. `words`: a 70 ms stagger per word; `lines`: 120 ms per line; `pop`: scale 0.92 to 1 with opacity. Values: `references/video/motion.md#kinetic-captions`. Effective value for scenes after the first: `scene ?? preview ?? theme.video ?? "rise"`. **Scene 1 keeps its caption complete at frame 0** (the hard loop cuts back to it) unless scene 1 sets `captionMotion` itself — that trades a complete frame 0 for the animation, so set `poster` to a later scene (as `examples/preview-recorded` does). **`"none"` behaves like `"rise"`**: only `in: "none"` (the entrance) removes the caption animation. Languages without spaces (ja, zh, th) animate the whole title as one unit. A scene without a title falls back to `rise` |

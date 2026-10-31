@@ -38,7 +38,8 @@ export function reactionFrame(diffs, from, to, { threshold = REACT_MAD } = {}) {
 }
 
 // commands[0] is the sync command. Others get t = the frame before their reaction
-// ('frame'), or the end of the command when nothing reacts in its window ('window').
+// ('frame'), or, when nothing reacts in the window ('window'): typing its end, a tap or swipe at most 0.5 s after its
+// start (Maestro acts first, then waits for the screen to settle, which a ticking timer stretches to 10 s and more).
 export function alignCommands(commands, diffs, fps, { slack = 0.5, shiftRange = [-3, 1] } = {}) {
   const sync = findSync(diffs);
   if (sync == null) throw new Error('no full-screen change found for the sync step — does the first step open a different screen?');
@@ -54,7 +55,7 @@ export function alignCommands(commands, diffs, fps, { slack = 0.5, shiftRange = 
       if (i === 0) return { ...c, t: sync / fps, align: 'frame' };
       const from = (c.startMs - offsetMs) / 1000, end = (c.startMs + c.durMs - offsetMs) / 1000;
       const r = reactionFrame(diffs, Math.max(Math.round(from * fps), last + 1), Math.round((end + slack) * fps));
-      if (r == null) return { ...c, t: end, align: 'window' };
+      if (r == null) return { ...c, t: c.kind === 'type' ? end : Math.min(end, from + 0.5), align: 'window' };
       last = r; hits++;
       return { ...c, t: (r - 1) / fps, align: 'frame' };
     });

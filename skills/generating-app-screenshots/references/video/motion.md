@@ -107,6 +107,11 @@ How the timeline is aligned:
   of 8 commands aligned. `alignCommands` therefore also tries one global shift between -3 s and +1 s, in frame steps,
   and keeps the one that aligns the most commands (nearest to 0 on a tie). A shift must align at least 2 more commands
   than the anchor, so a single stray change cannot move the clock. The take log prints `clock shifted -1.20 s`.
+- Frames are timed by presentation time. Simulator recordings reorder frames by up to about 7 s, and ffmpeg's default
+  timestamp guess (from dts) put 987 of 2815 AptusFIT frames up to 3.4 s off what AVFoundation (QuickTime) shows, so
+  every tap matched the wrong reaction. `clipArgs` reads with `-fflags +igndts` (matches AVFoundation to 1 ms) and cuts
+  clips with `trim` on that same timeline, never `-ss` before `-i` (which mislabelled frames after a 7 s still gap).
+  Takes recorded before this fix have wrong marks: record them again.
 - A tap's real time is the reaction frame inside its command window. Maestro reports a command's start time and a duration
   that includes waiting and retries, so the command window only bounds the search.
 - Target accuracy is plus or minus 1 frame. The spike did not fully reach it: re-check on the first real app (AptusFIT).

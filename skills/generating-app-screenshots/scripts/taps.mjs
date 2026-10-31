@@ -64,19 +64,24 @@ export function readSidecar(mov) {
 }
 
 // [from, to) in seconds. `from` defaults to the start of the file; `to` to the next mark after `from`, else the end of the file.
+// A mark may carry an offset, "start+2" or "swap-0.5": a mark sits on its tap, a scene often starts once the screen has loaded.
 export function markSpan(sidecar, from, to, fileDuration) {
   const marks = sidecar.marks || {};
-  const look = (name) => {
+  const parse = (ref) => {
+    const [, name, off] = /^(.*?)([+-]\d+(?:\.\d+)?)?$/.exec(ref);
     if (!Object.hasOwn(marks, name)) throw new Error(`unknown mark "${name}" (marks: ${Object.keys(marks).join(', ') || 'none'})`);
-    return marks[name];
+    return { at: marks[name], t: Math.round((marks[name] + Number(off || 0)) * 1000) / 1000 };
   };
+  const look = (ref) => parse(ref).t;
   const start = from == null ? 0 : look(from);
   if (to != null) {
     const end = look(to);
     if (!(end > start)) throw new Error(`mark "${to}" (${end}s) is not after "${from ?? 'start'}" (${start}s)`);
     return { start, end };
   }
-  const next = Object.values(marks).filter((t) => t > start);
+  // the next mark after the named one: "reorder-0.5" runs past the reorder mark, not up to it
+  const after = from == null ? start : Math.max(start, parse(from).at);
+  const next = Object.values(marks).filter((t) => t > after);
   return { start, end: next.length ? Math.min(...next) : fileDuration };
 }
 

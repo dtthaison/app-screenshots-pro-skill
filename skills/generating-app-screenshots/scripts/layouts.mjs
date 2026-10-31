@@ -199,8 +199,11 @@ export function buildLayout(slide, ctx) {
       return [wide ? caption({ y: 4.5, h: 15, w: 84, titleSize: 3.4 }) : caption(), lap, ph];
     }
 
-    case 'text-top':
-      return [caption(), withFit(device({ x: 50 }), t.dTop, t.dBot, t.dMax)];
+    case 'text-top': {
+      // a title alone (preview scenes) needs no subtitle band: without the lift the phone sat ~8% below it (AptusFIT)
+      const lift = tall && !slide.subtitle && !slide.eyebrow ? 8 : 0;
+      return [caption(lift ? { h: t.ch - lift - 0.5 } : {}), withFit(device({ x: 50 }), t.dTop - lift, t.dBot, t.dMax)];
+    }
 
     case 'text-bottom': {
       const top = tall ? 5 : 4, capY = tall ? 79 : 81;

@@ -59,6 +59,17 @@ test('alignCommands: keeps shift 0 when the end anchor already aligns everything
                 { seq: 2, kind: 'tap', startMs: 14_200, durMs: 400, step: 2 }];
   assert.equal(alignCommands(cmds, diffs, 30).shiftMs, 0);
 });
+test('alignCommands: a window tap that Maestro held open waiting to settle is timed near its start, not its end', () => {
+  // A ticking rest timer kept Maestro's tapOn waiting 13 s; the tap itself happens as the command starts.
+  const d = Float64Array.from({ length: 900 }, (_, i) => (i === 12 ? 80 : 0.4));
+  const cmds = [{ seq: 0, kind: 'open', startMs: 0, durMs: 400, step: 0 },
+                { seq: 1, kind: 'tap', startMs: 5000, durMs: 13_000, step: 1 },
+                { seq: 2, kind: 'type', startMs: 20_000, durMs: 3000, step: 2 }];
+  const { offsetMs, events } = alignCommands(cmds, d, 30);
+  assert.equal(events[1].align, 'window');
+  assert.equal(events[1].t, (5000 + 500 - offsetMs) / 1000);
+  assert.equal(events[2].t, (20_000 + 3000 - offsetMs) / 1000);   // typing ends when the command does
+});
 test('alignCommands throws when there is no sync frame', () => {
   assert.throws(() => alignCommands([{ seq: 0, kind: 'open', startMs: 0, durMs: 1, step: 0 }], new Float64Array(50), 30),
     /no full-screen change found for the sync step/);

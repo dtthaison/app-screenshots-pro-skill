@@ -90,3 +90,12 @@ test('stillMeta finds relative and {locale} stills under the absolute key', () =
   assert.equal(stillMeta('missing.png', opts), null);
   assert.equal(stillMeta('mock.html', opts), null);
 });
+
+test('text-top on a tall canvas: no subtitle or eyebrow moves the device up under the title', () => {
+  const dev = (s) => buildLayout({ id: 's', layout: 'text-top', title: 'x', screen: 'a.png', ...s }, ctx).find((e) => e.id === 'device');
+  const cap = (s) => buildLayout({ id: 's', layout: 'text-top', title: 'x', screen: 'a.png', ...s }, ctx).find((e) => e.id === 'caption');
+  assert.equal(dev({ subtitle: 'y' }).y, 25.5);
+  assert.equal(dev({ eyebrow: 'y' }).y, 25.5);
+  assert.equal(dev({}).y, 17.5);
+  assert.ok(cap({}).y + cap({}).h <= 17.5, 'the caption box ends above the device');
+});

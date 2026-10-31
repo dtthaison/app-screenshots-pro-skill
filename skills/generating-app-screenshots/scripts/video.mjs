@@ -227,10 +227,21 @@ export function probeClip(ffmpeg, file) {
 
 export function clipKey({ file, start, end, speed, height }) {
   const st = fs.statSync(file);
-  return crypto.createHash('sha1').update([st.size, st.mtimeMs, start, end, speed, height].join('|')).digest('hex').slice(0, 12);
+  // 'pts': clips cut before clipArgs (input seek, dts-guessed timestamps) may be seconds off on simulator takes
+  return crypto.createHash('sha1').update(['pts', st.size, st.mtimeMs, start, end, speed, height].join('|')).digest('hex').slice(0, 12);
 }
 
-// Cut [start,end] of a screen recording into 30 fps JPEGs (re-encoded, so -ss before -i is frame-accurate).
+// ffmpeg args that cut [start,end] into 30 fps JPEGs on the recording's presentation timeline, the one record.mjs times
+// marks on. simctl .mov files reorder frames by up to ~7 s; there ffmpeg's dts-based timestamp guess put 987 of 2815
+// frames up to 3.4 s off (AptusFIT), and `-ss` before `-i` mislabelled frames by a 7 s still gap. So: ignore dts (matches
+// AVFoundation to 1 ms) and cut with trim after fps, never an input seek.
+export function clipArgs({ file, start = 0, end, speed = 1, height, out }) {
+  const vf = [`fps=${FPS}`, `trim=start=${start}${end != null ? `:end=${end}` : ''}`, 'setpts=PTS-STARTPTS',
+    speed !== 1 ? `setpts=PTS/${speed},fps=${FPS}` : null, height ? `scale=-2:${height}` : null].filter(Boolean).join(',');
+  return ['-hide_banner', '-loglevel', 'error', '-fflags', '+igndts', '-i', file, '-vf', vf, '-q:v', '2', '-y', out];
+}
+
+// Cut [start,end] of a screen recording into 30 fps JPEGs (see clipArgs).
 // Extracts into `dir.tmp` and renames on success; a `.done` marker is the only cache hit, so partial runs re-extract.
 export function extractClip(ffmpeg, { file, start = 0, end, speed = 1, height, dir }) {
   const list = () => fs.readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort().map((f) => path.join(dir, f));
@@ -239,9 +250,7 @@ export function extractClip(ffmpeg, { file, start = 0, end, speed = 1, height, d
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(tmp, { recursive: true });
-    const vf = [`setpts=PTS/${speed}`, `fps=${FPS}`, height ? `scale=-2:${height}` : null].filter(Boolean).join(',');
-    const args = ['-hide_banner', '-loglevel', 'error', '-ss', String(start), ...(end != null ? ['-to', String(end)] : []), '-i', file, '-vf', vf, '-q:v', '2', '-y', path.join(tmp, '%05d.jpg')];
-    const r = spawnSync(ffmpeg, args, { stdio: 'pipe', encoding: 'utf8' });
+    const r = spawnSync(ffmpeg, clipArgs({ file, start, end, speed, height, out: path.join(tmp, '%05d.jpg') }), { stdio: 'pipe', encoding: 'utf8' });
     if (r.status !== 0) {
       fs.rmSync(tmp, { recursive: true, force: true });
       throw new Error(`ffmpeg exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-10).join('\n')}`);
