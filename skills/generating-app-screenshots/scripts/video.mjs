@@ -225,6 +225,9 @@ export function probeClip(ffmpeg, file) {
   return { duration: +d[1] * 3600 + +d[2] * 60 + +d[3], width: w, height: h, fps: fps ? +fps[1] : null };
 }
 
+// Chrome caps textures near 16k px: a video page captured at `scale` must stay under it (stills clamp the same way).
+export const captureScale = (scale, W, H) => Math.min(scale, 16000 / Math.max(W, H));
+
 export function clipKey({ file, start, end, speed, height }) {
   const st = fs.statSync(file);
   // 'pts': clips cut before clipArgs (input seek, dts-guessed timestamps) may be seconds off on simulator takes
@@ -319,9 +322,12 @@ export function startEncoder(ffmpeg, args) {
   };
 }
 
-// QA contact sheet: the frame nearest every `step` seconds (max 30 tiles), 10 per row, 240 px high, second number underneath.
-export async function filmstrip(frames, out, step = 1) {
+// QA contact sheet: the frame nearest every `step` seconds (max 30 tiles; by default the whole video), 10 per row, 240 px high,
+// second number underneath.
+export async function filmstrip(frames, out, step) {
   const H = 240, GAP = 8, LABEL = 28, COLS = 10;
+  // 30 tiles at most: by default spread them over the whole video, so a video over 30 s is reviewed to its end
+  step ??= Math.max(1, Math.ceil((Math.max(...frames.map((f) => f.t)) + 1e-9) / 30));
   const pick = [];
   for (let i = 0; i < 30; i++) {
     const k = i * step, f = frames.find((x) => x.t >= k && x.t < k + step);
@@ -341,5 +347,5 @@ export async function filmstrip(frames, out, step = 1) {
     comp.push({ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${colW}" height="${LABEL}"><text x="${colW / 2}" y="20" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333" text-anchor="middle">${t.k}</text></svg>`), left: x, top: y + H });
   });
   await sharp({ create: { width: w, height: h, channels: 3, background: '#e6e6e6' } }).composite(comp).jpeg({ quality: 88 }).toFile(out);
-  return { file: out, w, h };
+  return { file: out, w, h, last: pick.at(-1).k };
 }

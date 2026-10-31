@@ -77,6 +77,13 @@ test('band and scrim get a valid solid colour from preset, gradient and slide ba
   r = run({ background: '#111' }, { background: { color: '#abcdef' } });
   assert.equal(r.band, '#abcdef');
   assert.equal(solidBackground(undefined), '#000');
+  // a CSS gradient or image string is not a colour: color-mix() and a band fill would be dropped by the browser
+  assert.equal(solidBackground('linear-gradient(#123, #456)'), '#123');
+  assert.equal(solidBackground('linear-gradient(180deg, rgba(1, 2, 3, .5) 0%, #000 100%)'), 'rgba(1, 2, 3, .5)');
+  assert.equal(solidBackground('url(bg.png) center / cover'), '#000');
+  r = run({ background: 'radial-gradient(circle, #ff7e5f, #feb47b)' });
+  assert.equal(r.band, '#ff7e5f');
+  assert.ok(cssOk(r.band) && cssOk(r.scrim.stops[0]));
 });
 
 test('stillMeta finds relative and {locale} stills under the absolute key', () => {

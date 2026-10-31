@@ -16,6 +16,17 @@
 - `evals/evals.json`: 4 skill evals for the recommend and storyboard steps.
 - Upgrade note: existing 1.1.0 preview configs that show device frames on `preview-*` targets now get the WARN `device frames risk rejection under 2.3.4 — use full-screen or caption-band` for each framed scene. Fix: switch those scenes to `full-screen` or `caption-band`.
 - Docs: `references/reading-the-app.md` §2b is rewritten around `record.mjs` (moments, deep links, test IDs), and `references/config.md` documents every new field and message.
+- Fixes from the first real app (AptusFIT, React Native on the iOS Simulator):
+  - Recordings are read by presentation time (`-fflags +igndts`) and clips are cut with `trim` on that timeline, never an input seek. Simulator takes reorder frames by up to ~7 s; ffmpeg's dts-based guess put a third of the frames up to 3.4 s off, so taps matched the wrong reactions and clips landed seconds away. **Takes recorded with an earlier 1.2.0 build can have wrong marks: record them again.**
+  - The sync fits one global clock shift (-3 s to +1 s) when the app changes the screen before `openLink` returns; the take log prints `clock shifted …`. A tap Maestro held open waiting for the screen to settle is timed near its start.
+  - `record.boot`: shell steps after every terminate, for Expo dev clients that relaunch to their launcher.
+  - `clip.from` / `clip.to` take offsets (`"start+2"`, `"swap-0.5"`); a mark named like `tab-2` is still found whole. With an offset `from` and no `to`, the clip runs to the next mark after the named one.
+  - `text-top` lifts the device under a title that has no subtitle or eyebrow (the phone sat ~8% below it).
+  - The recorder clears the 9:41 status bar and restores the hardware-keyboard setting when it ends, also on failure. `record` steps that are not objects, and `wait` values that are not numbers 0 or more, are validation messages.
+  - Contact sheets spread their 30 tiles over the whole video or take, so anything over 30 s is reviewed to its end.
+  - `--supersample` is for stills only; videos use `--video-supersample` (default 1), and both stay under Chrome's ~16k px texture limit. Upgrade note: a run that used `--supersample` to sharpen videos now needs `--video-supersample`.
+  - A CSS gradient string background gives the `full-screen` scrim and the `caption-band` band its first colour instead of an invalid fill.
+  - The hand-over report lists each ramped scene's recording span.
 
 ## 1.1.0 (2026-10-30)
 

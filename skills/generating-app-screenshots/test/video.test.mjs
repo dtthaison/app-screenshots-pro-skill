@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, clipArgs, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning } from '../scripts/video.mjs';
+import { buildTimeline, stateAt, sameState, posterTime, checkDuration, timeCode, findFfmpeg, probeClip, clipKey, clipArgs, captureScale, extractClip, encodeArgs, startEncoder, filmstrip, selectScenes, missingClipWarning } from '../scripts/video.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'asp-video-'));
@@ -301,14 +301,18 @@ test('filmstrip picks one frame per second: 60 frames at 30 fps over 2 s -> 2 ti
     assert.deepEqual([r.w, r.h], [8 + 2 * (120 + 8), 8 + 1 * (240 + 28 + 8)]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
-test('filmstrip step reaches late frames: seconds 60-89 fall outside the 30 tiles at step 1, and fill 10 tiles at step 3', async () => {
+test('filmstrip step reaches late frames: seconds 60-89 fall outside the 30 tiles at step 1, fill 10 tiles at step 3, and the default step covers the whole video', async () => {
   const d = tmp();
   try {
     const buf = await sharp({ create: { width: 100, height: 200, channels: 3, background: '#00ff00' } }).png().toBuffer();
     const frames = Array.from({ length: 30 }, (_, i) => ({ t: 60 + i, buf }));
-    await assert.rejects(filmstrip(frames, path.join(d, 'a.jpg')), /no frames/);
+    await assert.rejects(filmstrip(frames, path.join(d, 'a.jpg'), 1), /no frames/);
     const r = await filmstrip(frames, path.join(d, 'b.jpg'), 3);
     assert.deepEqual([r.w, r.h], [8 + 10 * (120 + 8), 8 + 1 * (240 + 28 + 8)]);
+    // the default step spans the whole video, so a 90 s render's sheet reaches its end card
+    const all = Array.from({ length: 90 }, (_, i) => ({ t: i, buf }));
+    const a = await filmstrip(all, path.join(d, 'c.jpg'));
+    assert.deepEqual([a.w, a.h, a.last], [8 + 10 * (120 + 8), 8 + 3 * (240 + 28 + 8), 87]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
 
@@ -402,4 +406,10 @@ test('stateAt taps array keeps a fixed length; inactive taps are -1', () => {
   const mid = stateAt(tl, 5.3).scenes[1].taps;
   assert.ok(mid[0] > 0 && mid[1] > 0);                                         // two taps 0.2 s apart, both drawing
   assert.deepEqual(stateAt(tl, 5.3).scenes[0].taps, []);
+});
+test('captureScale keeps a video capture under Chrome\'s ~16k texture limit', () => {
+  assert.equal(captureScale(1, 886, 1920), 1);
+  assert.equal(captureScale(0.5, 886, 1920), 0.5);                  // renderScale drafts stay as asked
+  assert.equal(captureScale(3, 3840, 1646), 3);                      // 11520 px fits
+  assert.equal(captureScale(5, 3840, 1646), 16000 / 3840);           // 19200 px would not
 });

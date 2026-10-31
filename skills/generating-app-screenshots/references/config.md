@@ -26,7 +26,7 @@ Paths are relative to the config file. Coordinates for every element:
   "panorama": { ... },                      // optional, see below
   "slides": [ ... ],                        // order = upload order
   "previews": [ ... ],                      // optional app preview / creative videos, see "previews"
-  "videoSupersample": 1                     // render scale for videos (default 1; --supersample overrides)
+  "videoSupersample": 1                     // render scale for videos (default 1; --video-supersample overrides)
 }
 ```
 
@@ -464,15 +464,15 @@ A preview of real footage runs: **brief → `recommend.mjs` → storyboard (this
 | `tap` | `{ "id": "..." }`, `{ "text": "..." }` or `{ "point": "50%,80%" }` | `id`/`text` are looked up in the rehearsal (`maestro hierarchy`) and stored as a box. A `text` on screen can still be "not found" when the app merges it into a parent's label (a card read as `UPPER, 60 MIN, Start Workout`) or draws it in a native sheet: tap its `point` |
 | `swipe` | `{ "from": "50%,70%", "to": "50%,30%", "ms": 400 }` | `ms` optional |
 | `type` | a string | Maestro `inputText`, typed character by character; recorded as one `type` event |
-| `wait` | seconds | On any step, after its action |
-| `mark` | a name | On an action step only. Names the time in the recording, so scenes can say `clip.from` / `clip.to` |
+| `wait` | seconds, a number 0 or more | On any step, after its action |
+| `mark` | a name | On an action step only. Names the time in the recording, so scenes can say `clip.from` / `clip.to`. A name such as `tab-2` is found whole before `-2` is read as an offset |
 
 **`record.boot`** runs after the app is terminated, before the rehearsal and before each take. It is needed by an Expo dev client, which relaunches onto its launcher instead of the project, so deep links and taps would hit the wrong screen while point taps still pass the rehearsal (the take then fails with `0/2 taps aligned to a frame`). A boot script opens the dev-client URL, waits for the bundle, and presses Home so the first `open` still changes the whole screen.
 
 To dismiss the keyboard, `tap` a blank point of the screen and set `"tap": "none"` on the scene that shows it (Maestro's `hideKeyboard` failed on a React Native chat list). A network wait too long for the ramp (`clip span … needs …s with still stretches at 4×`) is left out between two scenes: end one before it and start the next after it, with marks or `clip.start`/`end` seconds read off the sheet; the report lists each scene's recording span. Points are whole percents (`"50%,80%"`); Maestro rejects fractions. `shell` is only allowed in `setup` and `boot`. The record block is checked before anything runs, with these messages (verbatim):
 `record.steps is missing or empty` · `the first step must be an "open": it changes the whole screen, and that change is how the recording is synced to Maestro` · `step N: "shell" is only allowed in setup and boot` · `step N: unknown key "k"` · `step N: has more than one of open, tap, swipe, type` · `step N: "tap" needs id, text or point` · `step N: "swipe" needs from and to` · `step N: tap.point "x" must be whole percents like "50%,80%" (Maestro rejects fractions)` · `mark "m" used twice` · `step N: mark "m" is on a wait-only step; put it on the action step it belongs to` · `setup step N: needs a "shell" string` · `boot step N: needs a "shell" string` · `record.app (the app id) is missing`.
 
-**`record.mjs`**: `node scripts/record.mjs <config.json> --preview <id> [--udid U] [--locales a,b] [--takes 3]`. It needs Maestro 2.6+ (`maestro 2.6+ is needed to record: curl -Ls "https://get.maestro.mobile.dev" | bash`), `xcrun simctl`, exactly one booted simulator or `--udid`, and the app installed. Per locale it runs `setup`, sets the status bar to 9:41, rehearses every step (an element not found, or a system alert such as a permission prompt, is an ERROR and nothing is recorded), then films the take and writes `recordings/<locale>/<preview>.mov`, `.taps.json` and `.sheet.jpg` next to the config. With `--takes n` a failed take, or one where more than half the taps could not be aligned to a frame, is retried; a failed run leaves the previous recording, sidecar and sheet untouched. Exit 1 on any ERROR. `ASP_KEEP_TMP=1` keeps the temp folder.
+**`record.mjs`**: `node scripts/record.mjs <config.json> --preview <id> [--udid U] [--locales a,b] [--takes 3]`. It needs Maestro 2.6+ (`maestro 2.6+ is needed to record: curl -Ls "https://get.maestro.mobile.dev" | bash`), `xcrun simctl`, exactly one booted simulator or `--udid`, and the app installed. Per locale it runs `setup`, sets the status bar to 9:41 (cleared again when the run ends, also on failure; so is the hardware-keyboard setting it turns off), rehearses every step (an element not found, or a system alert such as a permission prompt, is an ERROR and nothing is recorded), then films the take and writes `recordings/<locale>/<preview>.mov`, `.taps.json` and `.sheet.jpg` next to the config. With `--takes n` a failed take, or one where more than half the taps could not be aligned to a frame, is retried; a failed run leaves the previous recording, sidecar and sheet untouched. Exit 1 on any ERROR. `ASP_KEEP_TMP=1` keeps the temp folder.
 
 **The sidecar** `<recording>.taps.json` is what makes `tap`, marks and ramps work: `{ "version": 1, "fps", "width", "height", "syncOffset", "events": [ { "t", "kind": "tap|swipe|type", "x", "y", "w", "h", "x2", "y2", "dur", "text", "step", "align": "frame|window" } ], "marks": { "name": seconds } }`. Positions are fractions of the screen. `align: "frame"` means the time comes from a reaction frame; `"window"` means no clear frame change, so the command's end time was used and the ripple may be early or late. A recording made by hand, or with a hand-written sidecar like `examples/preview/recordings/en-US/walk.taps.json`, is valid.
 
@@ -551,9 +551,9 @@ Taps and ramps for a clip are deterministic: the same recording and config give 
 ## CLI
 
 `node scripts/render.mjs <config> [--out dir] [--locales a,b] [--targets a,b] [--slides a,b] [--format png|jpeg|webp] [--supersample 2] [--fastlane] [--no-preview]`
-`  [--previews a,b] [--scenes a,b] [--no-previews] [--only-previews] [--check]`
+`  [--previews a,b] [--scenes a,b] [--no-previews] [--only-previews] [--check] [--video-supersample 1]`
 Rendering happens at `supersample`× (default 2; config `"supersample"`) and is downsampled with Lanczos for crisp edges. Use 1 for quick drafts.
-`--supersample` applies to both passes; the video default is 1 (`videoSupersample` in the config sets it). `renderScale` on a video target (or in a preview's `byTarget`) renders at that fraction and upscales: drafts only (`NOTE … rendered at 0.5× — drafts only`).
+`--supersample` applies to stills only. Videos render at 1× by default (`--video-supersample n` or `videoSupersample` in the config), because a 2-3× capture is several times slower; both passes stay under Chrome's ~16k px texture limit. `renderScale` on a video target (or in a preview's `byTarget`) renders at that fraction and upscales: drafts only (`NOTE … rendered at 0.5× — drafts only`).
 `--targets` and `--locales` filter both passes. `--slides` filters screenshots only. `--previews tour` renders only those previews. `--scenes a,b` renders only those scenes of a preview (for iterating; the duration check is skipped and a NOTE says so). `--no-previews` skips the video pass and `--only-previews` skips the screenshot pass (`--no-preview`, singular, is the QA sheets). A video target in `targets` with no `previews` in the config is an ERROR.
 Screens may carry a query (`screens/stats.html?state=before`) that the HTML mock reads, so one mock can show several states.
 Exit code 0 = clean; 1 = validation errors (wrong size, alpha, too many files, overflowing text, missing screen/string, duration out of range); 2 = crash.

@@ -65,10 +65,11 @@ export function readSidecar(mov) {
 
 // [from, to) in seconds. `from` defaults to the start of the file; `to` to the next mark after `from`, else the end of the file.
 // A mark may carry an offset, "start+2" or "swap-0.5": a mark sits on its tap, a scene often starts once the screen has loaded.
+// A whole name wins over an offset, so a mark named "tab-2" stays "tab-2" ("tab-2+1" is that mark plus 1 s).
 export function markSpan(sidecar, from, to, fileDuration) {
   const marks = sidecar.marks || {};
   const parse = (ref) => {
-    const [, name, off] = /^(.*?)([+-]\d+(?:\.\d+)?)?$/.exec(ref);
+    const [, name, off] = Object.hasOwn(marks, ref) ? [ref, ref, 0] : /^(.*?)([+-]\d+(?:\.\d+)?)?$/.exec(ref);
     if (!Object.hasOwn(marks, name)) throw new Error(`unknown mark "${name}" (marks: ${Object.keys(marks).join(', ') || 'none'})`);
     return { at: marks[name], t: Math.round((marks[name] + Number(off || 0)) * 1000) / 1000 };
   };

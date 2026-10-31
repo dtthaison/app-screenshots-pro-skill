@@ -22,6 +22,8 @@ export function validateRecord(record) {
   const errs = [];
   const steps = record?.steps;
   if (!Array.isArray(steps) || !steps.length) return ['record.steps is missing or empty'];
+  const bad = steps.flatMap((s, i) => (s && typeof s === 'object' && !Array.isArray(s) ? [] : [`step ${i + 1}: must be an object like { "tap": { "id": "save" } }`]));
+  if (bad.length) return bad;
   if (steps[0].open == null) errs.push('the first step must be an "open": it changes the whole screen, and that change is how the recording is synced to Maestro');
   const marks = new Set();
   steps.forEach((s, i) => {
@@ -30,6 +32,7 @@ export function validateRecord(record) {
     for (const k of Object.keys(s)) if (!STEP_KEYS.has(k) && k !== 'shell') errs.push(`step ${n}: unknown key "${k}"`);
     if (ACTIONS.filter((k) => s[k] != null).length > 1) errs.push(`step ${n}: has more than one of ${ACTIONS.join(', ')}`);
     if (s.tap && s.tap.id == null && s.tap.text == null && s.tap.point == null) errs.push(`step ${n}: "tap" needs id, text or point`);
+    if (s.wait != null && !(typeof s.wait === 'number' && s.wait >= 0)) errs.push(`step ${n}: wait must be a number of seconds, 0 or more (got ${JSON.stringify(s.wait)})`);
     if (s.swipe && (s.swipe.from == null || s.swipe.to == null)) errs.push(`step ${n}: "swipe" needs from and to`);
     for (const [what, v] of [['tap.point', s.tap?.point], ['swipe.from', s.swipe?.from], ['swipe.to', s.swipe?.to]])
       if (v != null && !/^\d+%,\d+%$/.test(v)) errs.push(`step ${n}: ${what} "${v}" must be whole percents like "50%,80%" (Maestro rejects fractions)`);
@@ -99,6 +102,10 @@ export function buildSidecar({ fps, width, height, device, locale, offsetMs, eve
 
 const log = (m) => console.log(m);
 const fail = (m) => { throw new Error(m); };
+const KEYBOARD = ['com.apple.iphonesimulator', 'ConnectHardwareKeyboard'];
+// `defaults` args that put the hardware-keyboard setting back: `prev` is the `defaults read` result from before the run.
+export const keyboardRestoreArgs = (prev) =>
+  (prev.status !== 0 ? ['delete', ...KEYBOARD] : ['write', ...KEYBOARD, '-bool', prev.stdout.trim() === '1' ? 'true' : 'false']);
 // Maestro ends its output with a promo box; the failure is above it.
 const tail = (r, n = 5) => (r.stdout + r.stderr).split('\n').filter((l) => l.trim() && !/[│╭╰]/.test(l)).slice(-n).join(' | ');
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, ...opts });
@@ -210,7 +217,7 @@ async function writeBest(best, { outDir, id, tmp, takesRun }) {
   const frames = [];
   for (let k = 0; k * best.clip.fps < best.clip.count; k++) frames.push({ t: k, buf: fs.readFileSync(best.clip.files[k * best.clip.fps]) });
   const sheet = path.join(dir, 'sheet.jpg');
-  await filmstrip(frames, sheet, Math.ceil(frames.length / 30));   // a long take must still be reviewable end to end
+  await filmstrip(frames, sheet);   // spreads its 30 tiles over the whole take
   best.sidecar.takes = takesRun;
   const taps = path.join(dir, 'taps.json');
   fs.writeFileSync(taps, JSON.stringify(best.sidecar, null, 2) + '\n');
@@ -240,10 +247,16 @@ export async function main(argv) {
   const device = pickUdid(flag('udid'));
   const udid = device.udid;
   if (simctl('get_app_container', udid, record.app).status !== 0) fail(`app ${record.app} is not installed on ${device.name} (${udid})`);
-  run('defaults', ['write', 'com.apple.iphonesimulator', 'ConnectHardwareKeyboard', '-bool', 'false']);
+  const keyboard = run('defaults', ['read', ...KEYBOARD]);
+  run('defaults', ['write', ...KEYBOARD, '-bool', 'false']);
   log('NOTE: hardware keyboard turned off so inputText shows the soft keyboard; restart Simulator if it was already running with one.');
+  // the 9:41 status bar and the keyboard setting are put back however the run ends
+  try { await recordLocales(); } finally {
+    simctl('status_bar', udid, 'clear');
+    run('defaults', keyboardRestoreArgs(keyboard));
+  }
 
-  for (const locale of locales) {
+  async function recordLocales() { for (const locale of locales) {
     const appLocale = record.locales?.[locale] || locale;
     const sub = (s) => substitute(s, { udid, locale, appLocale });
     log(`[${locale}] ${device.name} ${udid}`);
@@ -278,7 +291,7 @@ export async function main(argv) {
       for (const e of best.windowTaps) log(`  NOTE: tap at step ${e.step + 1} has no clear frame change; its ripple may be early or late`);
       log(`  wrote ${path.relative(process.cwd(), path.join(outDir, id)) || id}.mov, .taps.json, .sheet.jpg`);
     } finally { if (process.env.ASP_KEEP_TMP) log(`  kept ${tmp}`); else fs.rmSync(tmp, { recursive: true, force: true }); }
-  }
+  } }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
