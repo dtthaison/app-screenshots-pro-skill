@@ -625,7 +625,7 @@ async function resolvePreviews({ ffmpeg }) {
           dev.clipFrames = ex.files.map(fileUrl);
           imageMeta.set(ex.files[0], imageMeta.get(info.file));
           clip = { frames: map.length, fps: ex.fps, map };
-          if (auto) ramps.push({ scene: scene.id, saved: Math.max(0, (ex.count - map.length) / ex.fps) });   // fixed speeds are the author's choice
+          if (auto) ramps.push({ scene: scene.id, saved: Math.max(0, (ex.count - map.length) / ex.fps), from: start, to: end });   // fixed speeds are the author's choice
           // tap effects, in scene time: where the tap lands in the output after the ramp
           if (sidecar && tapStyle) {
             const accent = th.accent || '#ffcf5c';

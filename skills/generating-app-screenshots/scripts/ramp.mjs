@@ -48,7 +48,7 @@ export function fitMap(diffs, fps, { taps = [], targetFrames, idle, scene = '?' 
   const n = diffs.length, at = (max) => frameMap(rateCurve(n, fps, { idle, taps, max }));
   if (n <= targetFrames) return { map: at(1), max: 1 };
   let hi = 4, best = at(hi);
-  if (best.length > targetFrames) throw new Error(`clip span is ${(n / fps).toFixed(1)}s at 4× but scene "${scene}" lasts ${(targetFrames / fps).toFixed(1)}s`);
+  if (best.length > targetFrames) throw new Error(`clip span is ${(n / fps).toFixed(1)}s and needs ${(best.length / fps).toFixed(1)}s with still stretches at 4×, but scene "${scene}" lasts ${(targetFrames / fps).toFixed(1)}s`);
   let lo = 1;
   for (let k = 0; k < 20; k++) {
     const mid = (lo + hi) / 2, m = at(mid);

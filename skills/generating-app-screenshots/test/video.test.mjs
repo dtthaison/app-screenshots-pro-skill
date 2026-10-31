@@ -275,6 +275,17 @@ test('filmstrip picks one frame per second: 60 frames at 30 fps over 2 s -> 2 ti
     assert.deepEqual([r.w, r.h], [8 + 2 * (120 + 8), 8 + 1 * (240 + 28 + 8)]);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
+test('filmstrip step reaches late frames: seconds 60-89 fall outside the 30 tiles at step 1, and fill 10 tiles at step 3', async () => {
+  const d = tmp();
+  try {
+    const buf = await sharp({ create: { width: 100, height: 200, channels: 3, background: '#00ff00' } }).png().toBuffer();
+    const frames = Array.from({ length: 30 }, (_, i) => ({ t: 60 + i, buf }));
+    await assert.rejects(filmstrip(frames, path.join(d, 'a.jpg')), /no frames/);
+    const r = await filmstrip(frames, path.join(d, 'b.jpg'), 3);
+    assert.deepEqual([r.w, r.h], [8 + 10 * (120 + 8), 8 + 1 * (240 + 28 + 8)]);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
 test('filmstrip tiles one frame per second', async () => {
   const d = tmp();
   try {

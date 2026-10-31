@@ -39,6 +39,26 @@ test('alignCommands: overlapping windows do not claim the same reaction or the s
   const early = alignCommands([{ seq: 0, kind: 'open', startMs: 0, durMs: 300, step: 0 }, { seq: 1, kind: 'tap', startMs: 0, durMs: 200, step: 1 }], d, 30);
   assert.equal(early.events[1].align, 'window');
 });
+test('alignCommands: fits one global shift when the sync command returns long after its screen change', () => {
+  // The app changes the screen at frame 30 but Maestro's openLink returns 1.2 s (36 frames) later, so anchoring on the
+  // command end puts every later window 1.2 s early. Reactions sit at 150, 300 and 450; a fitted shift finds all three.
+  const d = Float64Array.from({ length: 600 }, (_, i) => (i === 30 ? 60 : [150, 300, 450].includes(i) ? 12 : 0.3));
+  // Maestro's clock equals video time here; each tap's reaction lands as the command returns.
+  const cmds = [{ seq: 0, kind: 'open', startMs: 0, durMs: 1000 + 1200, step: 0 },
+                { seq: 1, kind: 'tap', startMs: 4700, durMs: 300, step: 1 },
+                { seq: 2, kind: 'tap', startMs: 9700, durMs: 300, step: 2 },
+                { seq: 3, kind: 'tap', startMs: 14_700, durMs: 300, step: 3 }];
+  const { events, shiftMs } = alignCommands(cmds, d, 30);
+  assert.deepEqual(events.slice(1).map((e) => e.align), ['frame', 'frame', 'frame']);
+  assert.deepEqual(events.slice(1).map((e) => Math.round(e.t * 30)), [149, 299, 449]);
+  assert.ok(shiftMs < 0 && shiftMs >= -3000, `shift ${shiftMs}`);
+});
+test('alignCommands: keeps shift 0 when the end anchor already aligns everything', () => {
+  const cmds = [{ seq: 0, kind: 'open', startMs: 10_000, durMs: 300, step: 0 },
+                { seq: 1, kind: 'tap', startMs: 11_900, durMs: 500, step: 1 },
+                { seq: 2, kind: 'tap', startMs: 14_200, durMs: 400, step: 2 }];
+  assert.equal(alignCommands(cmds, diffs, 30).shiftMs, 0);
+});
 test('alignCommands throws when there is no sync frame', () => {
   assert.throws(() => alignCommands([{ seq: 0, kind: 'open', startMs: 0, durMs: 1, step: 0 }], new Float64Array(50), 30),
     /no full-screen change found for the sync step/);

@@ -24,7 +24,7 @@ test('frameMap is monotone and shorter than the source when ramped', () => {
 test('whole span idle: fits at 4x; too long at 4x throws with both lengths', () => {
   const idle = new Float64Array(300).fill(0.1);
   assert.ok(fitMap(idle, fps, { targetFrames: 90, idle: idleRuns(idle, fps) }).max <= 4);
-  assert.throws(() => fitMap(new Float64Array(300).fill(5), fps, { targetFrames: 60, idle: [], scene: 'log' }), /clip span is 10\.0s at 4× but scene "log" lasts 2\.0s/);
+  assert.throws(() => fitMap(new Float64Array(300).fill(5), fps, { targetFrames: 60, idle: [], scene: 'log' }), /clip span is 10\.0s and needs 10\.0s with still stretches at 4×, but scene "log" lasts 2\.0s/);
 });
 test('fitMap picks the smallest top speed that fits, and never exceeds the target', () => {
   const { map, max } = fitMap(quietThenBusy, fps, { targetFrames: 250, idle: idleRuns(quietThenBusy, fps) });

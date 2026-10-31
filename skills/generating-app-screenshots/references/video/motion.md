@@ -73,7 +73,7 @@ Ramps only compress, never below 1×. They hide waiting (network, loading, typin
 | Static review screens | 0.5-0.8× (not used: ramps never go below 1×) | joanseg | verified |
 | Time map | monotone `src(t_out)` from the integral of the rate; frames at `floor(src * fps)` | research notes section 6 | reported |
 
-A clip span entirely idle runs at 4×. A span too long even at 4× is an ERROR with both lengths. A span too short holds its
+A clip span entirely idle runs at 4×. A span too long even at 4× is an ERROR with the span, the length it needs and the scene length. A span too short holds its
 last frame, with the existing WARN.
 
 ## Holds and shot lengths
@@ -103,6 +103,10 @@ Tuned on a spike against a real simulator. Both are mean absolute differences be
 How the timeline is aligned:
 - The sync is anchored on the end of the opening `openLink` command, not its start. This cut the Maestro-to-video jitter
   from about 30 frames to about 4.
+- On AptusFIT (React Native) the screen changed 1.2 s before `openLink` returned, so every window was early and only 3
+  of 8 commands aligned. `alignCommands` therefore also tries one global shift between -3 s and +1 s, in frame steps,
+  and keeps the one that aligns the most commands (nearest to 0 on a tie). A shift must align at least 2 more commands
+  than the anchor, so a single stray change cannot move the clock. The take log prints `clock shifted -1.20 s`.
 - A tap's real time is the reaction frame inside its command window. Maestro reports a command's start time and a duration
   that includes waiting and retries, so the command window only bounds the search.
 - Target accuracy is plus or minus 1 frame. The spike did not fully reach it: re-check on the first real app (AptusFIT).

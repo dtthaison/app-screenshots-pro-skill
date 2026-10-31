@@ -26,7 +26,7 @@ export function validateRecord(record) {
   const marks = new Set();
   steps.forEach((s, i) => {
     const n = i + 1;
-    if (s.shell != null) errs.push(`step ${n}: "shell" is only allowed in setup`);
+    if (s.shell != null) errs.push(`step ${n}: "shell" is only allowed in setup and boot`);
     for (const k of Object.keys(s)) if (!STEP_KEYS.has(k) && k !== 'shell') errs.push(`step ${n}: unknown key "${k}"`);
     if (ACTIONS.filter((k) => s[k] != null).length > 1) errs.push(`step ${n}: has more than one of ${ACTIONS.join(', ')}`);
     if (s.tap && s.tap.id == null && s.tap.text == null && s.tap.point == null) errs.push(`step ${n}: "tap" needs id, text or point`);
@@ -39,7 +39,8 @@ export function validateRecord(record) {
       if (!isAction(s)) errs.push(`step ${n}: mark "${s.mark}" is on a wait-only step; put it on the action step it belongs to`);
     }
   });
-  (record.setup || []).forEach((s, i) => { if (typeof s.shell !== 'string') errs.push(`setup step ${i + 1}: needs a "shell" string`); });
+  for (const key of ['setup', 'boot'])
+    (record[key] || []).forEach((s, i) => { if (typeof s.shell !== 'string') errs.push(`${key} step ${i + 1}: needs a "shell" string`); });
   return errs;
 }
 
@@ -128,9 +129,10 @@ function maestroTest(udid, yamlFile, extra = []) {
   return run('maestro', ['--udid', udid, 'test', ...extra, yamlFile]);
 }
 
-function rehearse(udid, record, tmp) {
+function rehearse(udid, record, tmp, boot) {
   const resolved = [];   // every step (waits included), with its resolved point
   simctl('terminate', udid, record.app);   // same starting point as a take: an app left deep in a flow would resolve different elements
+  boot();
   record.steps.forEach((step, i) => {
     const n = i + 1;
     const nodes = hierarchy(udid);
@@ -155,11 +157,12 @@ function rehearse(udid, record, tmp) {
   return resolved;
 }
 
-async function recordOnce({ udid, record, resolved, tmp, ffmpeg, device, locale, takeNo }) {
+async function recordOnce({ udid, record, resolved, tmp, ffmpeg, device, locale, takeNo, boot }) {
   const dir = path.join(tmp, `take-${takeNo}`);
   fs.mkdirSync(dir, { recursive: true });
   // Every take starts from the home screen, so the first step's whole-screen change is there to sync on.
   simctl('terminate', udid, record.app);
+  boot();
   await new Promise((r) => setTimeout(r, 1000));
   const raw = path.join(dir, 'raw.mov');
   const rec = spawn('xcrun', ['simctl', 'io', udid, 'recordVideo', '--codec=h264', '--force', raw], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -192,9 +195,9 @@ export async function processTake({ ffmpeg, raw, dbg, dir, resolved, device, loc
     const clip = extractClip(ffmpeg, { file: raw, height: 480, dir: path.join(dir, 'frames') });
     const diffs = await frameDiffs(clip.files);
     const cmds = readCommands(dbg).filter((c) => c.kind !== 'wait');   // waits end WARNED, without a duration
-    const { offsetMs, events } = alignCommands(cmds, diffs, clip.fps);
+    const { offsetMs, shiftMs, events } = alignCommands(cmds, diffs, clip.fps);
     const taps = events.filter((e) => e.kind === 'tap');
-    return { ...result, ok: true, raw, dir, info, clip, events, offsetMs, diffs, taps, windowTaps: taps.filter((e) => e.align === 'window'),
+    return { ...result, ok: true, raw, dir, info, clip, events, offsetMs, shiftMs, diffs, taps, windowTaps: taps.filter((e) => e.align === 'window'),
       sidecar: buildSidecar({ fps: clip.fps, width: info.width, height: info.height, device: device.name, locale, offsetMs: offsetMs - recStartMs,
         events, steps: resolved.filter(isAction), takes: takeNo }) };
   } catch (e) {
@@ -207,7 +210,7 @@ async function writeBest(best, { outDir, id, tmp, takesRun }) {
   const frames = [];
   for (let k = 0; k * best.clip.fps < best.clip.count; k++) frames.push({ t: k, buf: fs.readFileSync(best.clip.files[k * best.clip.fps]) });
   const sheet = path.join(dir, 'sheet.jpg');
-  await filmstrip(frames, sheet);
+  await filmstrip(frames, sheet, Math.ceil(frames.length / 30));   // a long take must still be reviewable end to end
   best.sidecar.takes = takesRun;
   const taps = path.join(dir, 'taps.json');
   fs.writeFileSync(taps, JSON.stringify(best.sidecar, null, 2) + '\n');
@@ -244,25 +247,27 @@ export async function main(argv) {
     const appLocale = record.locales?.[locale] || locale;
     const sub = (s) => substitute(s, { udid, locale, appLocale });
     log(`[${locale}] ${device.name} ${udid}`);
-    for (const s of record.setup || []) {
+    const shell = (key) => { for (const s of record[key] || []) {
       const cmd = sub(s.shell);
-      log(`  setup: ${cmd}`);
+      log(`  ${key}: ${cmd}`);
       execSync(cmd, { cwd: cfgDir, stdio: 'inherit' });
-    }
+    } };
+    const boot = () => shell('boot');   // after every terminate: a dev client relaunches to its launcher, not the project
+    shell('setup');
     simctl('status_bar', udid, 'override', '--time', '9:41', '--batteryState', 'charged', '--batteryLevel', '100', '--cellularBars', '4', '--wifiBars', '3');
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'asp-record-'));
     try {
       const rec = { ...record, steps: record.steps.map((s) => (s.open != null ? { ...s, open: sub(s.open) } : s)) };
-      const resolved = rehearse(udid, rec, tmp);
+      const resolved = rehearse(udid, rec, tmp, boot);
       log(`  rehearsal ok (${rec.steps.length} steps)`);
       let best = null, n = 0, lastErr = '';
       for (let t = 1; t <= takes; t++) {
         n = t;
-        const r = await recordOnce({ udid, record: rec, resolved, tmp, ffmpeg, device, locale, takeNo: t });
+        const r = await recordOnce({ udid, record: rec, resolved, tmp, ffmpeg, device, locale, takeNo: t, boot });
         if (!r.ok) { lastErr = `maestro failed: ${r.log}`; log(`  take ${t}: ${lastErr}`); continue; }
         const bad = r.windowTaps.length > r.taps.length / 2;
-        log(`  take ${t}: ${r.taps.length - r.windowTaps.length}/${r.taps.length} taps aligned to a frame${bad ? ' (too many window taps)' : ''}`);
+        log(`  take ${t}: ${r.taps.length - r.windowTaps.length}/${r.taps.length} taps aligned to a frame${r.shiftMs ? ` (clock shifted ${(r.shiftMs / 1000).toFixed(2)} s)` : ''}${bad ? ' (too many window taps)' : ''}`);
         if (!best || r.windowTaps.length < best.windowTaps.length) best = r;
         if (!bad) break;
       }
