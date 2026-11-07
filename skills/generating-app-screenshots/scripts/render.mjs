@@ -662,7 +662,7 @@ async function resolvePreviews({ ffmpeg }) {
           y: !cap ? 6 : cap.y < 50 ? cap.y + (cap.h ?? 20) + 1 : cap.y - 6, size: 3.2, background: th.accent || '#ffcf5c', color: '#111', role: 'label', i: k }));
         scenes.push({ scene: { ...scene, labels: timed, captionMotion, words, taps: tapList, tapStyle: tapStyleUsed }, s, th, els, clip, overflow, labelEls });
         // texts the viewer reads, resolved for this locale; checked by storecheck.mjs
-        checkScenes.push({ id: scene.id, layout: s.layout, dev, hasCaption: !!capTitle,
+        checkScenes.push({ id: scene.id, layout: s.layout, dev, hasCaption: !!capTitle, ignore: scene.checks?.ignore,
           texts: [scene.eyebrow, scene.title, scene.subtitle, ...timed.map((l) => l.text)].map((x) => str(x, locale)).filter((x) => typeof x === 'string' && x) });
       } catch (e) { errors.push(`[${tag}/${scene.id}] ${e.message}`); }
     }
@@ -680,6 +680,7 @@ async function resolvePreviews({ ffmpeg }) {
       const r = storeChecks({ target, locale, preview, scenes: checkScenes, timeline, disclose: previewBrief?.owner?.disclose });
       for (const w of r.warnings) warnSet.add(w);
       for (const n of r.notes) notes.push(`[${tag}] ${n}`);
+      for (const e of r.errors) errors.push(`[${tag}] ${e}`);
     }
     if (drafts.length) notes.push(`[${tag}] draft stills stand in for missing recordings (${drafts.join(', ')}) — record the app for the final preview`);
     // moment: optional scene field naming a preview-brief.json moment id

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Store-rule checks (`scripts/storecheck.mjs`, `references/video/store-rules.md#enforcing-checks`):
+  - `time-sensitive` also flags season and holiday words in English and the locale's language (summer, Christmas, Black Friday, Weihnachten, Noël, Tết, mùa hè, クリスマス, 春节, 여름 …). Before, the message said "avoid seasons" but only years and months were checked.
+  - Months in scripts without spaces: "11月" was reported as "1月" and "十一月" as "一月"; Korean ("10월에") and Thai month names were missed. Now each is found and named correctly.
+  - `play-phrases` knows calls to action and rank claims in de, fr, es, pt, it, vi, ja, zh and ko, plus "No. 1", "number one" and "top-rated". A bare "best" is flagged only as "the best …" or "best <app word>", so "Be your best self" no longer warns; "the best of" passes (Play's "Best of" awards are allowed).
+  - `price` knows more currencies (`kr`, `zł`, `Kč`, `₺ ₽ ₴ ₪ ₦ ₸`, more ISO codes) and period words (`/Jahr`, `/an`, `/año`, `/mês`, `/năm`, `/월` …). ISO codes match in capitals only, and `TRY` / `PHP` only where they cannot be a word ("Try 7 days", "PHP 8" pass). The message quotes the whole amount (`"$9.99"`, was `"$9"`).
+  - `checks.ignore` on a preview or a scene switches off WARN and NOTE checks by name; unknown names are a WARN and ERROR checks cannot be ignored.
+  - `storeChecks` also returns `findings: [{ check, level, scene, message }]` and includes the `iphone-only` ERROR; beat lengths print rounded (`2.2s`, not `2.2000000000000002s`). Month, season and phrase regexes are compiled once per locale.
+
 ## 1.2.0 (2026-10-31)
 
 - Real-footage app previews, iPhone only (`preview-iphone`): brief → recommend → storyboard → record → review → render → hand-over.
