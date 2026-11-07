@@ -78,21 +78,36 @@ research notes read them.
 These names are implemented by `scripts/storecheck.mjs`. Levels never change the exit code: WARN and NOTE exit 0, ERROR
 exits 1.
 
+A WARN or NOTE check can be switched off with `"checks": { "ignore": ["time-sensitive"] }` on a preview (every scene)
+or on one scene. Unknown names are a WARN; ERROR checks cannot be ignored. `storeChecks` also returns each result as
+`{ check, level, scene, message }` (`findings`) beside the printed lines.
+
 ## framed-device
 WARN on `preview-*` targets. A device model other than `none`, or a style other than `frameless`, risks rejection under
 2.3.4. Message: `device frames risk rejection under 2.3.4 — use full-screen or caption-band`. Rows: `apple-frames`.
 
 ## price
-WARN on Apple preview and creative targets. Matches a currency symbol next to a digit (`$ € £ ¥ ₩ ₫ ฿ ₹ ₱`, `RM`, `Rp`,
-`R$`), ISO codes before or after digits, and period words (`/month`, `/mo`, `/year`, `/yr`, `/week`, `/Monat`, `/mois`,
-`/mes`, `/月`, `/tháng`, `/年`). Works in every locale. Rows: `apple-prices`.
+WARN on Apple preview and creative targets. Matches a currency symbol next to a digit (`$ € £ ¥ ₩ ₫ ฿ ₹ ₱ ₺ ₽ ₴ ₪ ₦ ₸`,
+`RM`, `Rp`, `R$`, `kr`, `zł`, `Kč`), ISO codes in capitals before or after digits (`TRY` and `PHP` only after the amount,
+or `PHP` before two or more digits, so "Try 7 days" and "PHP 8" pass), and period words after an amount (`/month`,
+`/mo`, `/year`, `/yr`, `/week`, `/Monat`, `/Jahr`, `/mois`, `/an`, `/mes`, `/año`, `/mês`, `/mese`, `/mån`, `/år`,
+`/tháng`, `/năm`, `/月`, `/年`, `/週`, `/월`, `/년` and more). The message quotes the whole amount. Works in every locale.
+Rows: `apple-prices`.
 
 ## play-phrases
-WARN on `play-promo`. Matches "install now", "download now", "best" and "#1". Rows: `play-phrases`.
+WARN on `play-promo`. Matches calls to action and rank claims in English and in the locale's language (de, fr, es, pt,
+it, vi, ja, zh, ko): "install now", "download now", "get it now", "#1", "No. 1", "number one", "top-rated",
+"Jetzt herunterladen", "Tải ngay", "tốt nhất", "今すぐダウンロード", "立即下载", "지금 다운로드" and the like. A bare "best" counts
+only as "the best …" or "best <app word>" ("best fitness app"), so "your best self" passes, and "the best of" passes
+because Play's "Best of" awards are allowed. "Free" is not matched: the video rule does not name it. Rows:
+`play-phrases`.
 
 ## time-sensitive
-NOTE on all video targets. A 4-digit year from 1990 to 2099, or a month name in the locale. Rows: `apple-seasonal`,
-`play-time-sensitive`.
+NOTE on all video targets. A 4-digit year from 1990 to 2099, a month name in the locale, or a season or holiday word
+in English or the locale's language (summer, Christmas, Black Friday, Weihnachten, Noël, Tết, mùa hè, クリスマス, 春节,
+여름 …). In scripts without spaces (ja, zh, ko, th) a name matches inside a word but never after a digit, so "11月" is
+reported as "11月", not "1月". Month names come from `Intl` in the nominative, so inflected forms such as Russian
+"в октябре" are missed. Rows: `apple-seasonal`, `play-time-sensitive`.
 
 ## reading-time
 WARN. A caption must be visible for at least 0.5 s + 0.3 s per word (see `motion.md#kinetic-captions`). Rows:

@@ -81,3 +81,63 @@ test('reading time counts the next transition and the entrance', () => {
   const longer = buildTimeline({}, [{ id: 'a', duration: 6, words: 5 }, { id: 'b', duration: 3, transition: { kind: 'crossfade', dur: 0.5 } }]);
   assert.equal(run(longer).length, 0);
 });
+
+// --- seasons, Play phrases in more languages, months in scripts without spaces, currencies, findings and checks.ignore
+
+test('time-sensitive: seasons and holidays in the locale language and English', () => {
+  for (const [s, l] of [['Summer sale', 'en'], ['Christmas deals', 'en-GB'], ['Black Friday', 'de'], ['Neu zu Weihnachten', 'de'],
+    ['Ưu đãi Tết', 'vi'], ['Mùa hè sôi động', 'vi'], ['クリスマス限定', 'ja'], ['春节特惠', 'zh'], ['여름 세일', 'ko'], ['Spécial Noël', 'fr']]) assert.ok(timeSensitive(s, l), s);
+  for (const [s, l] of [['Train every day', 'en'], ['Fall in love with running', 'en'], ['Il a été facile', 'fr'], ['Summertime', 'en']]) assert.equal(timeSensitive(s, l), null, s);
+});
+test('time-sensitive: months in scripts without spaces name the right month', () => {
+  assert.match(timeSensitive('11月の新機能', 'ja'), /"11月"/);
+  assert.match(timeSensitive('十一月新功能', 'zh'), /"十一月"/);
+  assert.match(timeSensitive('10월에 새로', 'ko'), /"10월"/);
+  assert.match(timeSensitive('ใหม่ในเดือนตุลาคมนี้', 'th'), /ตุลาคม/);
+  assert.match(timeSensitive('Mới tháng 10', 'vi'), /"tháng 10"/i);
+});
+test('play phrases in the locale language and English', () => {
+  for (const [s, l] of [['Jetzt herunterladen', 'de'], ['Tải ngay', 'vi'], ['Ứng dụng tốt nhất', 'vi'], ['Descarga ahora', 'es-MX'],
+    ['今すぐダウンロード', 'ja'], ['立即下载', 'zh-CN'], ['지금 다운로드', 'ko'], ['Download now', 'de'], ['No. 1 in fitness', 'en'],
+    ['Number one coach', 'en'], ['Best fitness app', 'en'], ['Top-rated coach', 'en']]) assert.ok(playPhrase(s, l), s);
+  for (const s of ['Be your best self', 'Your best workout yet', 'Best of Play 2025 winner', 'The best of both worlds', 'Bestow gifts']) assert.equal(playPhrase(s), null, s);
+  assert.equal(playPhrase('第11位', 'ja'), null);
+});
+test('price: more currencies; codes in capitals only', () => {
+  for (const s of ['99 kr', 'kr 49', '29,99 zł', '199 Kč', '₺49,99', '₽299', '₴99', '₪20', '50 TRY', 'PHP 199', '9 SEK', '5 €/an', '9,99 €/Jahr', '₩9900/월', '10.000 ₫/năm']) assert.ok(priceMatch(s), s);
+  for (const s of ['Try 7 days free', 'TRY 7 DAYS FREE', 'Works with PHP 8', 'php 8.3', '3D scans', 'Plan your year']) assert.equal(priceMatch(s), null, s);
+});
+
+const frameless = { model: 'none', style: 'frameless' };
+const oneScene = (texts, extra = {}) => ({ target: { id: 'preview-iphone', store: 'ios' }, locale: 'en-US', preview: {},
+  timeline: { scenes: [{ id: 'a', start: 0, end: 4, duration: 4, words: 2, captionMotion: 'none', labels: [] }] },
+  scenes: [{ id: 'a', layout: 'caption-band', dev: frameless, texts, hasCaption: false }], ...extra });
+test('storeChecks returns structured findings next to the printable lines', () => {
+  const r = storeChecks(oneScene(['Only $9.99 this summer']));
+  assert.deepEqual(r.findings.map((f) => [f.check, f.level, f.scene]), [['price', 'WARN', 'a'], ['time-sensitive', 'NOTE', 'a']]);
+  assert.match(r.warnings[0], /^scene "a": "\$9\.99" looks like a price/);
+  assert.match(r.notes[0], /^scene "a": "summer" dates the video/);
+});
+test('checks.ignore on the preview and on a scene; unknown names and ERROR checks are reported', () => {
+  assert.equal(storeChecks(oneScene(['Only $9.99 in May'], { preview: { checks: { ignore: ['time-sensitive'] } } })).notes.length, 0);
+  const sc = oneScene(['Only $9.99 in May']); sc.scenes[0].ignore = ['price'];
+  const r = storeChecks(sc);
+  assert.equal(r.findings.filter((f) => f.check === 'price').length, 0);
+  assert.equal(r.notes.length, 1);
+  const bad = storeChecks(oneScene([], { preview: { concept: 'feature-loop', checks: { ignore: ['prices', 'iphone-only'] } }, target: { id: 'preview-ipad', store: 'ios' } }));
+  assert.ok(bad.warnings.some((w) => /unknown check "prices"/.test(w)));
+  assert.ok(bad.warnings.some((w) => /"iphone-only" is an ERROR and cannot be ignored/.test(w)));
+  assert.deepEqual(bad.errors, ['iPhone only in this release (preview-iphone)']);
+});
+test('which targets run which text checks', () => {
+  const run = (target) => storeChecks({ ...oneScene(['Download now for $5']), target }).findings.map((f) => f.check).sort();
+  assert.deepEqual(run({ id: 'preview-iphone', store: 'ios' }), ['price']);
+  assert.deepEqual(run({ id: 'play-promo', store: 'android' }), ['play-phrases']);
+  assert.deepEqual(run({ id: 'creative-ios', store: 'ios', family: 'creative' }), ['price']);
+  assert.deepEqual(run({ id: 'creative-play', store: 'android', family: 'creative' }), []);
+});
+test('two end cards: the first is not last; beat lengths print rounded', () => {
+  const w = conceptWarnings('feature-loop', tl(['a', 2.2000000000000002], ['e1', 2], ['b', 3], ['e2', 2]), { endCardIds: ['e1', 'e2'] });
+  assert.deepEqual(w, ['end-card: scene "e1" is not the last scene']);
+  assert.match(conceptWarnings('feature-loop', tl(['a', 1.2345], ['e', 2]), { endCardIds: ['e'] })[0], /lasts 1\.23s/);
+});
