@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLayout, screenAspectError, solidBackground, stillMeta } from '../scripts/layouts.mjs';
+import { buildLayout, screenAspectError, solidBackground, stillMeta, LAYOUTS } from '../scripts/layouts.mjs';
 
 const ctx = { W: 886, H: 1920, theme: {}, target: { id: 'preview-iphone', store: 'ios', model: 'iphone' } };
 const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
@@ -105,4 +105,89 @@ test('text-top on a tall canvas: no subtitle or eyebrow moves the device up unde
   assert.equal(dev({ eyebrow: 'y' }).y, 25.5);
   assert.equal(dev({}).y, 17.5);
   assert.ok(cap({}).y + cap({}).h <= 17.5, 'the caption box ends above the device');
+});
+
+// ---- review fixes: colours with alpha, Play never shows Apple hardware, slide.device wins over layout geometry ----
+const play = { W: 1080, H: 1920, theme: {}, target: { id: 'android-phone', store: 'play', model: 'android' } };
+const byId = (els, id) => els.find((e) => e.id === id);
+
+test('arch: the fill takes any CSS accent colour, not just 6-digit hex', () => {
+  const fill = (accent) => byId(buildLayout({ id: 's', layout: 'arch', title: 'x', screen: 'a.png' }, { ...ctx, theme: { accent } }), 'arch').fill;
+  assert.equal(fill('#abcdef'), 'linear-gradient(180deg,#abcdef66,#abcdef10 75%)');
+  assert.equal(fill(undefined), 'linear-gradient(180deg,#ffffff66,#ffffff10 75%)');
+  assert.equal(fill('#fff'), 'linear-gradient(180deg,#ffffff66,#ffffff10 75%)');
+  assert.equal(fill('white'), 'linear-gradient(180deg,color-mix(in srgb, white 40%, transparent),color-mix(in srgb, white 6%, transparent) 75%)');
+  assert.match(fill('rgb(10, 20, 30)'), /color-mix\(in srgb, rgb\(10, 20, 30\) 40%, transparent\)/);
+});
+
+test('phone-tablet: the back tablet is an iPad on Apple stores and an Android tablet on Play', () => {
+  const back = (c, s = {}) => byId(buildLayout({ id: 's', layout: 'phone-tablet', title: 'x', screen: 'a.png', screen2: 'b.png', ...s }, c), 'device2');
+  assert.equal(back(ctx).model, 'ipad');
+  assert.equal(back(play).model, 'android-tablet');
+  assert.equal(back({ ...ctx, target: { store: 'social', model: 'iphone' } }).model, 'ipad');
+  assert.equal(back(play, { device2: { model: 'ipad' } }).model, 'ipad', 'a slide override still wins');
+});
+
+test('laptop-phone: no MacBook on Play; laptopModel and device2.model still win', () => {
+  const lap = (c, s = {}) => byId(buildLayout({ id: 's', layout: 'laptop-phone', title: 'x', screen: 'a.png', screen2: 'b.png', ...s }, c), 'device2');
+  assert.equal(lap(ctx).model, 'macbook');
+  assert.equal(lap({ ...ctx, target: { store: 'msstore', model: 'windows-window' } }).model, 'desktop');
+  assert.equal(lap(play).model, 'desktop');
+  assert.equal(lap(play, { laptopModel: 'browser' }).model, 'browser');
+  assert.equal(lap(play, { device2: { model: 'macbook' } }).model, 'macbook');
+  assert.equal(lap(ctx, { laptopModel: 'desktop' }).model, 'desktop');
+});
+
+test('no layout puts Apple hardware on a Play canvas', () => {
+  const APPLE = ['iphone', 'iphone-notch', 'iphone-home', 'ipad', 'apple-watch', 'macbook', 'mac-window'];
+  const slide = { title: 'x', screen: 'a.png', screen2: 'b.png', screen3: 'c.png' };
+  for (const layout of LAYOUTS) for (const c of [play, { ...play, W: 1440, H: 2560, target: { ...play.target, model: 'android-tablet' } }]) {
+    for (const e of buildLayout({ id: 's', layout, ...slide }, c).filter((x) => x.type === 'device'))
+      assert.ok(!APPLE.includes(e.model), `${layout}: ${e.id} is ${e.model} on ${c.target.model}`);
+  }
+});
+
+// The layout's own geometry is a default: slide.device / device2 / ... keys are merged "into the layout's device" and win.
+const CANVASES = {
+  tall: ctx,
+  tablet: { W: 1200, H: 1600, theme: {}, target: { id: 'preview-ipad', store: 'ios', model: 'ipad' } },
+  wide: { W: 1920, H: 1080, theme: {}, target: { id: 'x-post', store: 'social', model: 'iphone' } },
+  desk: { W: 2880, H: 1800, theme: {}, target: { id: 'mac', store: 'ios', family: 'desktop', model: 'macbook' } },
+  watch: { W: 422, H: 514, theme: {}, target: { id: 'watch-ultra@styled', store: 'ios', family: 'watch', model: 'apple-watch' } },
+};
+const FULL = { title: 'x', subtitle: 'y', screen: 'a.png', screen2: 'b.png', screen3: 'c.png', photo: 'p.png', appName: 'A',
+  callouts: [{ text: 'c', at: [50, 30] }], features: [{ title: 'f' }], steps: [{ title: 's' }], stats: [{ value: '1', label: 'l' }], awards: [{ title: 'a' }],
+  review: { quote: 'q', author: 'a' }, metric: { value: '1', label: 'l' }, orbit: [{ text: 'o' }], notifications: [{ title: 'n' }] };
+
+test('slide.device / device2 / watch overrides of w and y survive in every layout on every canvas class', () => {
+  const hasDevice = new Set(), checked = new Set();
+  for (const [cname, c] of Object.entries(CANVASES)) for (const layout of LAYOUTS) {
+    const base = buildLayout({ id: 's', layout, ...FULL }, c);
+    const ids = base.filter((e) => e.type === 'device').map((e) => e.id);
+    if (!ids.length) continue;
+    hasDevice.add(layout);
+    for (const id of ids) {
+      const els = buildLayout({ id: 's', layout, ...FULL, [id]: { w: 50, y: 60 } }, c);
+      const d = byId(els, id);
+      assert.deepEqual([d.w, d.y], [50, 60], `${layout} on ${cname}: slide.${id} {w:50, y:60} gave w ${d.w} / y ${d.y}`);
+      checked.add(`${layout}/${id}`);
+    }
+  }
+  // layouts without a device of their own on any canvas
+  assert.deepEqual(LAYOUTS.filter((l) => !hasDevice.has(l)).sort(), ['blank', 'caption-only', 'caption-top', 'end-card', 'feature-grid', 'steps']);
+  for (const k of ['landscape/device', 'landscape/device2', 'screen-hero/device', 'watch-hero/device', 'caption-band/device', 'deck/device2', 'deck/device3', 'mosaic/tile1', 'mosaic/tile4', 'text-left/device', 'phone-watch/watch'])
+    assert.ok(checked.has(k), `${k} was not exercised`);
+});
+
+test('landscape: the documented repro (slide.device {w: 50, y: 60}) and the layout default without it', () => {
+  const land = (dev) => byId(buildLayout({ id: 's', layout: 'landscape', title: 'x', screen: 'a.png', device: dev }, ctx), 'device');
+  assert.deepEqual(pick(land({ w: 50, y: 60 }), ['w', 'y']), { w: 50, y: 60 });
+  assert.deepEqual(pick(land({}), ['w', 'y']), { w: 94, y: 38 }, 'layout default when the slide sets nothing');
+  assert.equal(land({ x: 30 }).x, 30);
+});
+
+test('geometry that depends on a moved device follows it: the second landscape device stacks under an overridden first', () => {
+  const els = buildLayout({ id: 's', layout: 'landscape', title: 'x', screen: 'a.png', screen2: 'b.png', device: { y: 40 } }, ctx);
+  assert.equal(byId(els, 'device').y, 40);
+  assert.ok(byId(els, 'device2').y > 40 + 10, 'device2 sits below device');
 });

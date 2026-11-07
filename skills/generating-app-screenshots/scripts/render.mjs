@@ -14,6 +14,7 @@ import { chromium } from 'playwright-core';
 import { resolveTarget, storeLocale, isRtl, scriptFont, isVideoTarget, checkTargetFormat } from './targets.mjs';
 import { renderDevice, screenRect, screenRadius, MODELS, kindOf } from './devices.mjs';
 import { PRESETS } from './presets.mjs';
+import { mockOutName, cssUrl, localize, screenRefs, fastlanePath } from './refs.mjs';
 import { buildLayout, canvasClass, screenAspectError, stillMeta } from './layouts.mjs';
 import { patternElements, sceneSvg } from './panorama.mjs';
 import { splitWords, wordsHtml, wordCount, resolveCaptionMotion } from './kinetic.mjs';
@@ -74,7 +75,8 @@ const warn = (m) => { warnings.push(m); };
 
 // ---------- helpers ----------
 const abs = (p) => (path.isAbsolute(p) ? p : path.join(BASE, p));
-const fileUrl = (p) => pathToFileURL(abs(p)).href;
+// cssUrl: ' ( ) in a path ("Son's Apps") would end a CSS url('…') early
+const fileUrl = (p) => cssUrl(pathToFileURL(abs(p)).href);
 function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 function merge(a, b) {
   if (!isObj(a) || !isObj(b)) return b === undefined ? a : b;
@@ -115,19 +117,8 @@ function addStrings(src) {
 }
 addStrings(cfg.strings);
 
-function str(v, locale) {
-  if (v == null) return null;
-  if (isObj(v)) return v[locale] ?? v[locale.split('-')[0]] ?? v[defaultLocale] ?? null;
-  if (typeof v !== 'string' || !v.startsWith('@')) return v;
-  const key = v.slice(1);
-  const lang = locale.split('-')[0];
-  const hit = STRINGS[locale]?.[key] ?? STRINGS[lang]?.[key];
-  if (hit != null) return hit;
-  warn(`[${locale}] missing translation "${key}" — fell back to ${defaultLocale}`);
-  const fb = STRINGS[defaultLocale]?.[key];
-  if (fb == null) errors.push(`string key "${key}" not found in any locale`);
-  return fb ?? key;
-}
+// locale, its language, then defaultLocale and its language (see refs.mjs)
+const str = (v, locale) => localize(v, locale, { strings: STRINGS, defaultLocale, warn, error: (m) => errors.push(m) });
 
 // display text: pick: 'highlight' takes the **marked** words of a title (else the longest word), localized
 function pickText(el, locale) {
@@ -229,8 +220,8 @@ function resolveScreen(src0, locale, model, landscape, { fullPage = false } = {}
     const m = MODELS[model] || MODELS.iphone;
     let [vw, vh] = m.viewport || [440, 956];
     if (landscape) [vw, vh] = [vh, vw];
-    const tag = query ? `.${query.replace(/[^a-z0-9]+/gi, '_')}` : '';
-    const out = path.join(OUT, '.build', 'screens', `${path.basename(found, path.extname(found))}${tag}${fullPage ? '.full' : ''}.${locale}.${vw}x${vh}.png`);
+    // keyed by source path: screens/one/index.html and screens/two/index.html are two mocks
+    const out = path.join(OUT, '.build', 'screens', mockOutName({ found: abs(found), query, fullPage, locale, vw, vh }));
     if (!htmlDone.has(out)) htmlQueue.set(out, { file: abs(found), locale, out, vw, vh, query, ...(fullPage ? { fullPage } : {}) });
     return out;
   }
@@ -329,7 +320,7 @@ function elementHtml(el, ctx, locale) {
         : el.crop || [0, 0, 100, 30];
       const w = (el.w / 100) * ctx.W, h = el.circle ? w : w * (ch / cw) * asp;
       const tilt = el.tiltX || el.tiltY ? `perspective(${px(w * 4)}) rotateY(${el.tiltY || 0}deg) rotateX(${el.tiltX || 0}deg) ` : '';
-      return `<div class="el" style="${box(`height:${px(h)};border-radius:${el.circle ? '50%' : px((el.radius ?? 3) * S)};${tilt ? `transform:${tilt}rotate(${el.rotate || 0}deg);` : ''}overflow:hidden;background:url('${src ? pathToFileURL(src).href : ''}') ${(-cx / cw) * w}px ${(-cy / ch) * h}px/${(100 / cw) * w}px ${(100 / ch) * h}px no-repeat;box-shadow:${el.shadow || `0 ${px(2 * S)} ${px(5 * S)} rgba(0,0,0,.35)`};border:${el.border || `${px(0.5 * S)} solid rgba(255,255,255,.9)`}`)}"></div>`;
+      return `<div class="el" style="${box(`height:${px(h)};border-radius:${el.circle ? '50%' : px((el.radius ?? 3) * S)};${tilt ? `transform:${tilt}rotate(${el.rotate || 0}deg);` : ''}overflow:hidden;background:url('${src ? fileUrl(src) : ''}') ${(-cx / cw) * w}px ${(-cy / ch) * h}px/${(100 / cw) * w}px ${(100 / ch) * h}px no-repeat;box-shadow:${el.shadow || `0 ${px(2 * S)} ${px(5 * S)} rgba(0,0,0,.35)`};border:${el.border || `${px(0.5 * S)} solid rgba(255,255,255,.9)`}`)}"></div>`;
     }
     case 'arrow': {
       // from [x,y] to [x,y] in % of slide; gentle curve
@@ -569,7 +560,7 @@ async function resolvePreviews({ ffmpeg }) {
           scene.screen = scene.draft;
           drafts.push(scene.id);
         }
-        await loadImageMeta([scene.screen, scene.screen2, scene.screen3, ...(scene.elements || []).map((e) => e.screen)], locale);
+        await loadImageMeta(screenRefs(scene), locale);
         const { s, th, els } = slideElements({ ...scene, labels: timed.length ? undefined : scene.labels }, target, locale, W, H, base);
         const dev = els.find((e) => e.type === 'device' && e.id === 'device');
         // full-screen / caption-band: judge the recording (or still) against the canvas
@@ -1080,19 +1071,7 @@ async function main() {
   if (!slides.length && STILL_TARGETS.length) throw new Error('No slides to render');
 
   // collect image metadata for every referenced raster screen (aspect drives auto frames + zoom)
-  const allScreens = new Set();
-  for (const l of LOCALES) for (const t of STILL_TARGETS) for (const s of slides) {
-    const sp = specialize(s, t, l);
-    for (const src of [sp.screen, sp.screen2, ...(sp.elements || []).map((e) => e.screen)]) {
-      if (!src) continue;
-      for (const c of [src.replaceAll('{locale}', l), src.replaceAll('{locale}', l.split('-')[0]), src.replaceAll('{locale}', defaultLocale)])
-        if (fs.existsSync(abs(c)) && !/\.html?$/i.test(c)) allScreens.add(abs(c));
-    }
-  }
-  for (const p of allScreens) {
-    const m = await sharp(p).metadata();
-    imageMeta.set(p, { w: m.width, h: m.height, aspect: m.height / m.width });
-  }
+  for (const l of LOCALES) for (const t of STILL_TARGETS) for (const s of slides) await loadImageMeta(screenRefs(specialize(s, t, l)), l);
 
   const buildSheets = () => {
   const sheets = [];
@@ -1118,7 +1097,7 @@ async function main() {
         body += `<div class="slide" style="left:${i * W}px;width:${W}px">${backgroundHtml(bg, W, H)}${els.map((e) => elementHtml(e, ctx, locale)).join('')}</div>`;
       });
       const generated = pattern
-        ? patternElements(pattern, { theme: specialize(theme, target, locale), app: cfg.app?.name, n: group.length, cls: canvasClass(W, H) === 'tablet' ? 'tablet' : 'tall', opts: specialize(cfg.panorama.patternOptions || {}, target, locale),
+        ? patternElements(pattern, { theme: specialize(theme, target, locale), app: cfg.app?.name, n: group.length, W, H, model: target.model, cls: canvasClass(W, H) === 'tablet' ? 'tablet' : 'tall', opts: specialize(cfg.panorama.patternOptions || {}, target, locale),
             screens: group.map((sl) => specialize(sl, target, locale).screen).map((sc, i, a) => sc || a.find(Boolean)) })
         : [];
       (pano ? [...generated, ...(cfg.panorama.elements || [])] : []).forEach((e0, i) => {
@@ -1222,16 +1201,10 @@ async function main() {
   if (has('fastlane') || cfg.fastlane) {
     for (const m of manifest) {
       const t = STILL_TARGETS.find((x) => x.id === m.target);
-      let dest;
-      if (t.family === 'creative') {
-        dest = path.join(OUT, 'fastlane', 'creative', storeLocale(m.locale, 'ios'), `${t.baseId}_${m.slide}${path.extname(m.file)}`);
-        notes.push('creative assets (header, search, events) are not uploaded by deliver — add them in App Store Connect');
-      } else if (t.store === 'ios') dest = path.join(OUT, 'fastlane', 'screenshots', storeLocale(m.locale, 'ios'), `${String(m.index).padStart(2, '0')}_${t.baseId}_${m.slide}.png`);
-      else if (t.store === 'play') {
-        const base = path.join(OUT, 'fastlane', 'metadata', 'android', storeLocale(m.locale, 'play'), 'images');
-        if (!t.playDir) { notes.push(`${t.id}: Play Console has no fastlane folder for this form factor — upload by hand (out/${t.id.replace('@', '_')}/)`); continue; }
-        dest = ['featureGraphic', 'tvBanner'].includes(t.playDir) ? path.join(base, `${t.playDir}.png`) : path.join(base, t.playDir, `${m.index}_${m.locale}.png`);
-      } else continue;
+      if (t.family === 'creative') notes.push('creative assets (header, search, events) are not uploaded by deliver — add them in App Store Connect');
+      else if (t.store === 'play' && !t.playDir) notes.push(`${t.id}: Play Console has no fastlane folder for this form factor — upload by hand (out/${t.id.replace('@', '_')}/)`);
+      const dest = fastlanePath(OUT, t, m);   // keeps the real extension (--format jpeg)
+      if (!dest) continue;
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.copyFileSync(m.file, dest);
     }

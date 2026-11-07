@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `render.mjs` fixes (helpers in `scripts/refs.mjs`):
+  - Two HTML mocks with the same file name in different folders (`screens/one/index.html`, `screens/two/index.html`) shared one rendered PNG, so both slides showed the second mock. The output name now carries a short hash of the source path.
+  - A string or inline `{ "en": … }` value missing for a locale now falls back to `defaultLocale` and then its language. Before, `defaultLocale: "en-US"` with strings under `en` gave `string key not found` for every other locale, and inline values returned nothing (the title vanished).
+  - A project path with an apostrophe or parentheses (`~/Son's Apps/`) left background images and zoom cards black: `'`, `(` and `)` are now percent-encoded in file URLs used inside CSS `url('…')`.
+  - `--fastlane` with `--format jpeg` copied JPEG bytes to `.png` names; iOS screenshots, Play screenshots, the feature graphic and the TV banner keep the rendered file's extension (deliver and supply accept `.jpg`, `.jpeg` and `.png`).
+  - Image metadata (aspect) is now read for `screen3` and every entry of `screens` (mosaic), also for zoom sources of `popouts`, `lens` and `layers`, in stills and previews. Before, `device3` of `three-devices` and `deck` and mosaic tiles got the target's frame instead of the one `model: "auto"` picks, so a 16:9 image was cropped in a phone frame next to a tablet frame.
 - Store-rule checks (`scripts/storecheck.mjs`, `references/video/store-rules.md#enforcing-checks`):
   - `time-sensitive` also flags season and holiday words in English and the locale's language (summer, Christmas, Black Friday, Weihnachten, Noël, Tết, mùa hè, クリスマス, 春节, 여름 …). Before, the message said "avoid seasons" but only years and months were checked.
   - Months in scripts without spaces: "11月" was reported as "1月" and "十一月" as "一月"; Korean ("10월에") and Thai month names were missed. Now each is found and named correctly.
@@ -13,6 +19,12 @@
   - Korean season words must start a word ("돌봄", care, is not "봄"); "青春の" is not a season; curly apostrophes match ("Valentine’s Day").
   - A scene-level `checks.ignore` also silences `hook-timing` (first caption scene), a missing end card and `disclose` (last scene).
   - `storeChecks` also returns `findings: [{ check, level, scene, message }]` and includes the `iphone-only` ERROR; beat lengths print rounded (`2.2s`, not `2.2000000000000002s`). Month, season and phrase regexes are compiled once per locale.
+- Layouts and panorama patterns (`layouts.mjs`, `panorama.mjs`, `devices.mjs`):
+  - Colours with an alpha (stage floor and light, timeline badge halo, `arch` fill) no longer break with `#fff`, `white`, `rgb()` or `hsl()`: the hex byte was glued onto the user's colour, which is only valid for `#rrggbb`. New `withAlpha(color, a)` in `devices.mjs` returns hex for hex and `color-mix()` for the rest.
+  - `phone-tablet` and `laptop-phone` no longer put an iPad or MacBook next to an Android phone on Play: the back device is an `android-tablet` / `desktop` there (`laptopModel` and `device2.model` still win).
+  - `slide.device` / `device2` / `watch` / `tileN` overrides of `x`, `y`, `w` now win over the layout's own geometry in every layout (`landscape`, `screen-hero`, `caption-band`, `deck`, `mosaic`, desk `text-left` / `text-right` ignored them). The layout's numbers are defaults.
+  - Panorama patterns size the stage floor, constellation anchors and the giant word from the real canvas and frame instead of an iPhone on 1320×2868. `patternElements` takes `W`, `H` and `model`; without them it assumes the store's phone (iPhone 1320×2868) or tablet (iPad 2064×2752). `stage` shrinks its default device width on a 9:16 canvas so the phone and its floor stay on the canvas (an explicit `patternOptions.w` is kept).
+  - `screenRect` / `screenRadius` handle `landscape: true` devices (tap ripples and the spotlight of a recorded landscape clip were placed for a portrait phone). Devices with `rotate` or tilt are still not handled.
 
 ## 1.2.0 (2026-10-31)
 

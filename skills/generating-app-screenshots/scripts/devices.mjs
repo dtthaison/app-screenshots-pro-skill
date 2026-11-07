@@ -47,6 +47,17 @@ export const shade = (hex, amt) => {
   return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, '0')).join('')}`;
 };
 
+// c at opacity a (0..1) as a valid CSS colour, whatever the user wrote. Hex (#rgb #rgba #rrggbb #rrggbbaa) stays hex; names,
+// rgb(), hsl() and var() go through color-mix. An alpha c already has is kept (multiplied). `${c}33` is only valid for #rrggbb.
+export function withAlpha(c, a) {
+  a = Math.max(0, Math.min(1, a));
+  const s = String(c).trim(), m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(s);
+  if (!m) return `color-mix(in srgb, ${s} ${Math.round(a * 100)}%, transparent)`;
+  const h = m[1].length < 6 ? [...m[1]].map((x) => x + x).join('') : m[1];
+  const base = h.length === 8 ? parseInt(h.slice(6), 16) : 255;
+  return `#${h.slice(0, 6).toLowerCase()}${Math.round(a * base).toString(16).padStart(2, '0')}`;
+}
+
 // Visible height / visible width, for layout math.
 export function deviceAspect(el) {
   const g = geometry(el, 1000);
@@ -80,24 +91,28 @@ function geometry(el, W) {
 
 const px = (n) => `${Math.round(n * 100) / 100}px`;
 
-// Canvas-space rectangle of the screen of an UNROTATED portrait device (for callouts / annotations).
+// Width of the (portrait) body: el.w is the visible width, which for a landscape device is the body's HEIGHT (it is turned on its side)
+const portraitWidth = (el, ctx) => el.landscape ? (el.w / 100) * ctx.W / (geometry(el, 1000).bodyH / 1000) : bodyWidth(el, (el.w / 100) * ctx.W);
+
+// Canvas-space rectangle of the screen (for callouts / annotations / tap effects). Upright or landscape; a device with
+// `rotate` or tilt is not handled (its screen is no axis-aligned rectangle).
 export function screenRect(el, ctx) {
-  const g = geometry(el, bodyWidth(el, (el.w / 100) * ctx.W));
-  const left = (el.x / 100) * ctx.W - g.visW / 2 + g.pad.l + g.bezel;
-  const top = (el.y / 100) * ctx.H + g.pad.t + g.top;
-  return { left, top, width: g.screenW, height: g.screenH };
+  const g = geometry(el, portraitWidth(el, ctx));
+  const x = (el.x / 100) * ctx.W, y = (el.y / 100) * ctx.H;
+  // renderDevice turns the body -90° about the centre of a bodyH × bodyW box: the top bezel lands on the left, the side bezels above and below
+  if (el.landscape) return { left: x - g.bodyH / 2 + g.top, top: y + g.bezel, width: g.screenH, height: g.screenW };
+  return { left: x - g.visW / 2 + g.pad.l + g.bezel, top: y + g.pad.t + g.top, width: g.screenW, height: g.screenH };
 }
 
 // Corner radius (px) of that screen, as renderDevice draws it.
 export function screenRadius(el, ctx) {
-  const g = geometry(el, bodyWidth(el, (el.w / 100) * ctx.W));
+  const g = geometry(el, portraitWidth(el, ctx));
   return (g.frameless ? (el.radius ?? g.m.screenRadius) : g.m.screenRadius) * g.bodyW;
 }
 
 // el: normalized device element. ctx: { W, H } canvas px.
 export function renderDevice(el, ctx) {
-  const portraitW = el.landscape ? (el.w / 100) * ctx.W / (geometry(el, 1000).bodyH / 1000) : bodyWidth(el, (el.w / 100) * ctx.W);
-  const g = geometry(el, portraitW);
+  const g = geometry(el, portraitWidth(el, ctx));
   const kind = g.m.kind;
   const style = g.frameless ? 'frameless' : kind === 'window' ? 'window' : el.style || 'real';
   const defFrame = kind === 'laptop' || kind === 'desktop' ? COLORS['space-gray'] : COLORS['black-titanium'];

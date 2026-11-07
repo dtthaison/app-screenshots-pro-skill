@@ -4,6 +4,8 @@
 // people only see slide 1 (often only in search results). So patterns keep slide 1 self-contained, and the
 // "risk" column says how much of a device a seam cuts through.
 
+import { MODELS, deviceAspect, withAlpha } from './devices.mjs';
+
 export const PATTERN_INFO = {
   flow:            { risk: 'none',   text: 'One centered device per slide; only the background connects. Safest; every card stands alone.' },
   peek:            { risk: 'low',    text: 'Each device sits off-center so its edge peeks into the next card — a teaser that invites the swipe.' },
@@ -24,8 +26,10 @@ export const PATTERN_INFO = {
 };
 export const PATTERNS = Object.keys(PATTERN_INFO);
 
-// screens: one screen per slide (index-aligned). cls: 'tall' | 'tablet'.
-export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, app }) {
+// screens: one screen per slide (index-aligned). cls: 'tall' | 'tablet'. W, H (canvas px of ONE slide) and model (the target's
+// frame) size what depends on the real device height: stage floor, constellation anchors, the giant word. Without them the
+// store's own phone (1320×2868 iPhone) or tablet (2064×2752 iPad) is assumed.
+export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, app, W, H, model }) {
   const tall = cls !== 'tablet';
   const w0 = opts.w ?? (tall ? 70 : 54);           // standard device width (% of one slide)
   const top = opts.y ?? (tall ? 27 : 25);           // device top under the caption band
@@ -33,7 +37,9 @@ export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, 
   const dev = (o) => ({ type: 'device', z: 3, ...o });
   const out = [];
   const acc = opts.color || theme.accent || '#ffffff', ink = theme.caption?.color || '#ffffff';
-  const devH = (w) => w * (tall ? 2.07 * 0.46 : 1.38 * 0.75);   // device height in % of canvas height (approx.)
+  // 1% of slide width, in % of canvas height; device height (w = % of slide width) from the frame's own aspect
+  const ratio = W && H ? W / H : tall ? 1320 / 2868 : 2064 / 2752, frame = MODELS[model] && model !== 'none' ? model : tall ? 'iphone' : 'ipad';
+  const devH = (w) => w * deviceAspect({ model: frame }) * ratio;
   const line = (o) => ({ type: 'arrow', head: false, curve: 0, width: 0.45, color: ink, z: 1, ...o });
   switch (name) {
     case 'flow':
@@ -99,7 +105,7 @@ export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, 
       const ly = top + (tall ? 1.6 : 2);
       out.push(line({ from: [50, ly], to: [n * 100 + 5, ly], dash: [1.6, 1.3], width: 0.5, opacity: 0.6 }));
       for (let i = 0; i < n; i++) {
-        out.push({ type: 'badge', text: String(opts.labels?.[i] ?? i + 1), x: i * 100 + 50, y: ly - (tall ? 1.75 : 2.3), size: tall ? 3.8 : 2.8, background: acc, color: opts.labelColor || '#111', z: 6, shadow: `0 0 0 ${tall ? 10 : 12}px ${acc}33` });
+        out.push({ type: 'badge', text: String(opts.labels?.[i] ?? i + 1), x: i * 100 + 50, y: ly - (tall ? 1.75 : 2.3), size: tall ? 3.8 : 2.8, background: acc, color: opts.labelColor || '#111', z: 6, shadow: `0 0 0 ${tall ? 10 : 12}px ${withAlpha(acc, 0.2)}` });
         out.push(dev({ x: i * 100 + 50, y: ly + (tall ? 4.5 : 5), w: w0 * 0.92, screen: scr(i) }));
       }
       break;
@@ -107,7 +113,7 @@ export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, 
     case 'giant-word': {
       const word = String(opts.word || app || 'YOUR APP').toUpperCase();
       const size = Math.min(tall ? 120 : 80, (n * 100 * 0.96) / ([...word].length * 0.7 + 0.2));
-      const hPct = (size * 0.9) * (tall ? 0.46 : 0.75);
+      const hPct = size * 0.9 * ratio;
       const y = (opts.wordY ?? (tall ? 85 : 84)) - hPct / 2;   // low: phones overlap only the top of the letters
       const t = { type: 'text', text: word, x: n * 50, w: n * 100, size, fit: 'width', upper: true, nowrap: true, weight: 900, lineHeight: 0.9, tracking: -0.02 };
       out.push({ ...t, y, gradient: { angle: 90, stops: [acc, ink, acc] }, opacity: 0.5, z: 1 });
@@ -129,13 +135,14 @@ export function patternElements(name, { n, screens, cls, opts = {}, theme = {}, 
       break;
     }
     case 'stage': {
-      const w = w0 * 0.86, y = top + 1, floor = y + devH(w);
-      out.push({ type: 'shape', x: n * 50, y: floor - 2, w: n * 100 + 4, h: 104 - floor, z: 0, fill: `linear-gradient(180deg,${ink}30,${ink}0d 30%,rgba(0,0,0,0))` });
-      out.push({ type: 'shape', x: n * 50, y: floor - 2, w: n * 100 + 4, h: 0.15, z: 0, fill: `linear-gradient(90deg,transparent,${ink}88 10%,${ink}88 90%,transparent)` });
+      // the default size shrinks on a squat canvas (9:16 Play) so the whole phone and its floor stay at ≤ 86% of the height
+      const y = top + 1, w = opts.w != null ? w0 * 0.86 : Math.min(w0 * 0.86, (86 - y) / devH(1)), floor = y + devH(w);
+      out.push({ type: 'shape', x: n * 50, y: floor - 2, w: n * 100 + 4, h: 104 - floor, z: 0, fill: `linear-gradient(180deg,${withAlpha(ink, 0.19)},${withAlpha(ink, 0.05)} 30%,rgba(0,0,0,0))` });
+      out.push({ type: 'shape', x: n * 50, y: floor - 2, w: n * 100 + 4, h: 0.15, z: 0, fill: `linear-gradient(90deg,transparent,${withAlpha(ink, 0.533)} 10%,${withAlpha(ink, 0.533)} 90%,transparent)` });
       for (let i = 0; i < n; i++) {
         const x = i * 100 + 50;
         out.push({ type: 'shape', x, y: -2, w: tall ? 140 : 120, h: floor + 2, z: 1, blur: 1.6, clip: 'polygon(42% 0,58% 0,84% 100%,16% 100%)', fill: `linear-gradient(180deg,${opts.beam || 'rgba(255,255,255,.32)'},rgba(255,255,255,0) 92%)` });
-        out.push({ type: 'shape', shape: 'circle', x, y: floor - (tall ? 4.2 : 5.5), w: tall ? 100 : 86, h: tall ? 7 : 9, z: 1, fill: `radial-gradient(closest-side,${ink}66,rgba(255,255,255,0))` });
+        out.push({ type: 'shape', shape: 'circle', x, y: floor - (tall ? 4.2 : 5.5), w: tall ? 100 : 86, h: tall ? 7 : 9, z: 1, fill: `radial-gradient(closest-side,${withAlpha(ink, 0.4)},rgba(255,255,255,0))` });
         out.push({ type: 'shape', shape: 'circle', x, y: floor - 1.1, w: w * 0.9, h: tall ? 1.8 : 2.6, z: 2, blur: 0.8, fill: 'rgba(0,0,0,.55)' });
         out.push(dev({ x, y, w, screen: scr(i) }));
       }
