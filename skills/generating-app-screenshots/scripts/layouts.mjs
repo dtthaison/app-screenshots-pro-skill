@@ -3,7 +3,7 @@
 // y = TOP edge in % of slide height, w = width in % of slide width, h = max height in % of slide height.
 // Font sizes are in % of slide width.
 
-import { deviceAspect, screenRect, isDesktopModel } from './devices.mjs';
+import { deviceAspect, screenRect, isDesktopModel, withAlpha } from './devices.mjs';
 
 export const LAYOUT_INFO = {
   'text-top':      'Caption top, device bottom (bleeds off the edge). The workhorse; use for most slides.',
@@ -16,7 +16,7 @@ export const LAYOUT_INFO = {
   'corner':        'Large rotated device peeking from the bottom-right, caption left-aligned top.',
   'two-devices':   'Two overlapping phones (screen2 behind). Show two related screens.',
   'three-devices': 'Fan of three phones (screen2 left, screen3 right). Overview / variety.',
-  'phone-tablet':  'iPad behind + phone in front (screen = phone, screen2 = tablet). Cross-device apps.',
+  'phone-tablet':  'Tablet behind (iPad; Android tablet on Play) + phone in front (screen = phone, screen2 = tablet). Cross-device apps.',
   'landscape':     'Landscape phone under the caption. Games, video, maps.',
   'pop-out':       'Device with 1–2 magnified UI cards popping out (popouts: [{crop}]). Point at details.',
   'metric':        'Device with a big floating achievement card (metric: {icon,value,label}). Streaks, savings, PRs.',
@@ -141,6 +141,8 @@ export function buildLayout(slide, ctx) {
     if (d.imageAspect == null && ctx.aspectFor) d.imageAspect = ctx.aspectFor(d.screen, d.model, d.landscape);
     return d;
   };
+  // the layout's own geometry is only a default: whatever slide.device / device2 / … set (w, y, x …) wins over it
+  const geo = (d, o) => { for (const k in o) if (slide[d.id]?.[k] == null) d[k] = o[k]; return d; };
   const withFit = (d, top, bottom, maxW) => {
     if (d.w == null) d.w = fitWidth(d, W, H, top, bottom, maxW);
     if (d.y == null) d.y = top;
@@ -160,7 +162,7 @@ export function buildLayout(slide, ctx) {
     if (layout === 'text-left' || layout === 'text-right') {
       const left = layout === 'text-left';
       const d = withFit(device({ x: left ? 66 : 34 }), 12, 88, 62);
-      d.y = 50 - heightPct(d, W, H) / 2;
+      geo(d, { y: 50 - heightPct(d, W, H) / 2 });
       return [caption({ x: left ? 18 : 82, w: 30, y: 10, h: 80, align: left ? 'left' : 'right', valign: 'center', titleSize: 3.6 }), d];
     }
     const big = layout === 'device-hero';
@@ -184,16 +186,16 @@ export function buildLayout(slide, ctx) {
 
     case 'watch-hero': {
       // on a watch canvas the straps would only crop at the edges, so the case alone fills it
-      const wa = device({ x: 50, model: watchModel, z: 3, shadowOpacity: 0.4, ...(onWatch ? { band: false } : {}) }, 'device');
+      const wa = device({ x: cls === 'wide' ? 72 : 50, model: watchModel, z: 3, shadowOpacity: 0.4, ...(onWatch ? { band: false } : {}) }, 'device');
       wa.w ??= onWatch ? 70 : cls === 'wide' ? 26 : tall ? 66 : 50;
       wa.y ??= onWatch ? 17 : (cls === 'wide' ? 50 : tall ? 63 : 60) - heightPct(wa, W, H) / 2;
-      if (cls === 'wide') { wa.x = 72; return [sideCaption(), wa]; }
-      return [caption({ z: 6 }), wa];
+      return [cls === 'wide' ? sideCaption() : caption({ z: 6 }), wa];
     }
 
     case 'laptop-phone': {
       const wide = cls === 'wide';
-      const lap = device({ x: wide ? 45 : 50, model: slide.laptopModel || (ctx.target?.store === 'msstore' ? 'desktop' : 'macbook'), screen: slide.screen2 || slide.screen, z: 2 }, 'device2');
+      // no MacBook on Windows or Play (a Chromebook has no frame of its own; the plain monitor is neutral)
+      const lap = device({ x: wide ? 45 : 50, model: slide.laptopModel || (['msstore', 'play'].includes(ctx.target?.store) ? 'desktop' : 'macbook'), screen: slide.screen2 || slide.screen, z: 2 }, 'device2');
       lap.w ??= wide ? 74 : tall ? 104 : 92;
       lap.y ??= wide ? 22 : t.dTop + (tall ? 8 : 6);
       const ph = device({ x: wide ? 84 : tall ? 76 : 80, model: phoneModel, z: 4, shadowOpacity: 0.4 });
@@ -226,8 +228,8 @@ export function buildLayout(slide, ctx) {
 
     case 'screen-hero': {
       const d = device({ x: 50 });
-      d.w = fitWidth(d, W, H, 0, (tall ? 62 : 60) / 0.7, t.dMax + 8);
-      d.y = -0.3 * heightPct(d, W, H);
+      geo(d, { w: fitWidth(d, W, H, 0, (tall ? 62 : 60) / 0.7, t.dMax + 8) });
+      geo(d, { y: -0.3 * heightPct(d, W, H) });
       const capY = d.y + heightPct(d, W, H) + 3;
       return [d, caption({ y: capY, h: 100 - capY - 3, valign: 'center', titleSize: t.ts * 1.05 })];
     }
@@ -257,19 +259,20 @@ export function buildLayout(slide, ctx) {
     }
 
     case 'phone-tablet': {
-      const tab = withFit(device({ x: tall ? 42 : 40, model: 'ipad', screen: slide.screen2 || slide.screen, z: 1 }, 'device2'), t.dTop + 4, t.dBot + 30, tall ? 92 : 74);
+      // the tablet follows the store: iPad on Apple, Android tablet on Play (slide.device2.model still wins)
+      const tab = withFit(device({ x: tall ? 42 : 40, model: ctx.target?.store === 'play' ? 'android-tablet' : 'ipad', screen: slide.screen2 || slide.screen, z: 1 }, 'device2'), t.dTop + 4, t.dBot + 30, tall ? 92 : 74);
       const ph = withFit(device({ x: tall ? 78 : 76, z: 3 }), t.dTop + (tall ? 18 : 16), t.dBot + 6, tall ? 34 : 30);
       return [caption(), tab, ph];
     }
 
     case 'landscape': {
       const d = device({ x: cls === 'wide' ? 66 : 50, landscape: true });
-      d.w = cls === 'wide' ? 60 : tall ? 94 : 88;
-      d.y = cls === 'wide' ? 50 - heightPct(d, W, H) / 2 : tall ? 38 : 36;
-      if (tall && slide.screen2) {
-        d.y = 31;
+      const stacked = tall && slide.screen2;
+      geo(d, { w: cls === 'wide' ? 60 : tall ? 94 : 88 });
+      geo(d, { y: cls === 'wide' ? 50 - heightPct(d, W, H) / 2 : stacked ? 31 : tall ? 38 : 36 });
+      if (stacked) {
         const d2 = device({ x: 50, landscape: true, screen: slide.screen2, w: d.w }, 'device2');
-        d2.y = d.y + heightPct(d, W, H) + 4;
+        geo(d2, { y: d.y + heightPct(d, W, H) + 4 });
         return [caption({ y: 7, h: 20 }), d, d2];
       }
       const cap = cls === 'wide' ? caption({ x: 19, w: 32, y: 12, h: 76, align: 'left', valign: 'center' }) : caption({ y: tall ? 14 : 8, h: tall ? 20 : 22 });
@@ -332,7 +335,7 @@ export function buildLayout(slide, ctx) {
       screens.slice(0, 4).forEach((s, i) => {
         const [cx, cy] = cols[i % 2];
         const d = device({ x: cx, w, screen: s, style: 'frameless', radius: 0.08, rotate: -6, shadowOpacity: 0.25 }, `tile${i + 1}`);
-        d.y = cy + Math.floor(i / 2) * (heightPct(d, W, H) + 2.5);
+        geo(d, { y: cy + Math.floor(i / 2) * (heightPct(d, W, H) + 2.5) });
         out.push(d);
       });
       return out;
@@ -480,7 +483,8 @@ export function buildLayout(slide, ctx) {
     case 'arch': {
       const top = t.dTop + (tall ? 1 : 0);
       const aw = tall ? 84 : 70;
-      const fill = slide.arch || `linear-gradient(180deg,${theme.accent || '#ffffff'}66,${theme.accent || '#ffffff'}10 75%)`;
+      const ac = theme.accent || '#ffffff';
+      const fill = slide.arch || `linear-gradient(180deg,${withAlpha(ac, 0.4)},${withAlpha(ac, 0.063)} 75%)`;
       const d = withFit(device({ x: 50, z: 3 }), top + (tall ? 7.5 : 8), t.dBot + 6, aw - (tall ? 18 : 16));
       return [
         caption(),
@@ -556,7 +560,7 @@ export function buildLayout(slide, ctx) {
 
     case 'deck': {
       const base = withFit(device({ x: 44, z: 3, rotate: 7 }), t.dTop + 9, t.dBot + 10, t.dMax - 10);
-      const back = (key, scr, k, dx, dy, dim) => ({ ...device({ x: 44 + dx, z: 3 - k, rotate: 7, screen: scr || slide.screen }, key), w: base.w * (1 - 0.06 * k), y: base.y - dy, dim, shadowOpacity: 0.22 });
+      const back = (key, scr, k, dx, dy, dim) => geo(device({ x: 44 + dx, z: 3 - k, rotate: 7, screen: scr || slide.screen, dim, shadowOpacity: 0.22 }, key), { w: base.w * (1 - 0.06 * k), y: base.y - dy });
       return [caption(), back('device3', slide.screen3, 2, tall ? 26 : 22, tall ? 8 : 9, 0.38), back('device2', slide.screen2, 1, tall ? 13 : 11, tall ? 4 : 4.5, 0.18), base];
     }
 
@@ -577,7 +581,7 @@ export function buildLayout(slide, ctx) {
       const bandY = bottom ? 82 : 0, top = bottom ? 0 : 18;
       const band = { type: 'shape', id: 'band', x: 50, y: bandY, w: 100, h: 18, z: 3, fill: solidBackground(slide.background ?? theme.background) };
       const d = withFit(device({ model: 'none', style: 'frameless', radius: 0, shadow: false, x: 50 }), top, top + 82, 100);
-      d.y = top + Math.max(0, (82 - heightPct(d, W, H)) / 2);
+      geo(d, { y: top + Math.max(0, (82 - heightPct(d, W, H)) / 2) });
       return [band, caption({ y: bandY, h: 18, valign: 'center', z: 5 }), d];
     }
 

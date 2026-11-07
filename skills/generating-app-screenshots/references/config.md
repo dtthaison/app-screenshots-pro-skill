@@ -137,7 +137,7 @@ A CSS string (`"#101020"`, `"linear-gradient(160deg,#ff8a5c,#7c5cff)"`) or an ob
   "screen": "screens/{locale}/home.png",   // {locale} → en-US, then language (de), then defaultLocale. .html screens are rendered @3x
   "screen2": "screens/{locale}/detail.png",// second device in "two-devices"
   "background": { ... },               // overrides theme.background
-  "device": { "color": "cosmic-orange", "tiltY": -12 },     // merged into the layout's device
+  "device": { "color": "cosmic-orange", "tiltY": -12 },     // merged into the layout's device; its x, y, w win over the layout's own
   "device2": { ... },
   "caption": { "y": 8, "titleSize": 8 },                    // merged into the layout's caption
   "highlight": { "style": "marker", "color": "#fff3d6" },   // overrides theme.highlight on this slide
@@ -164,7 +164,7 @@ See all of them rendered: `examples/gallery/out/index.html` (config: `examples/g
 | `corner` | big rotated device from bottom-right, left caption → | | energy |
 | `two-devices` | back + front phone → | `screen2` | two related screens |
 | `three-devices` | fan of three → | `screen2`, `screen3` | overview |
-| `phone-tablet` | iPad behind, phone in front → | `screen2` (tablet) | cross-device |
+| `phone-tablet` | tablet behind (iPad; Android tablet on Play), phone in front → | `screen2` (tablet) | cross-device |
 | `landscape` | landscape device; on tall canvases stacks two | `screen2` (optional) | games, video, maps |
 | `pop-out` | device + 2 magnified UI cards → | `popouts: [{crop:[x,y,w,h]}]` | point at details |
 | `metric` | device + floating white achievement card → | `metric: {icon,value,label,color}` | streaks, savings |
@@ -190,7 +190,7 @@ See all of them rendered: `examples/gallery/out/index.html` (config: `examples/g
 |---|---|---|---|
 | `phone-watch` | phone with a watch in front, lower right | `screen2` (watch UI), `watchModel` (`apple-watch` default, `wear-os` on Play), `phoneModel`, `watch: {color, band}` (`band: false` for the case alone) | "also on your wrist" |
 | `watch-hero` | one big watch with straps under the caption (strap-less on a `@styled` watch target) | `screen` = watch UI, `watchModel`, `device: {color, band}` (`band: false` hides the straps) | watch launch, social, website, styled watch store shots |
-| `laptop-phone` | laptop with a phone in front (tall and wide canvases) | `screen2` (desktop UI), `laptopModel` (`macbook`; `desktop` on Windows), `device2: {color}` | cross-platform, sync |
+| `laptop-phone` | laptop with a phone in front (tall and wide canvases) | `screen2` (desktop UI), `laptopModel` (`macbook`; `desktop` on Windows and Play), `device2: {color}` | cross-platform, sync |
 
 All device frames rendered: `examples/devices/out/index.html` (config: `examples/devices/devices.config.json`).
 
