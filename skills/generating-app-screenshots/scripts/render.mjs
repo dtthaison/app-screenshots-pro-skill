@@ -1097,7 +1097,7 @@ async function main() {
         body += `<div class="slide" style="left:${i * W}px;width:${W}px">${backgroundHtml(bg, W, H)}${els.map((e) => elementHtml(e, ctx, locale)).join('')}</div>`;
       });
       const generated = pattern
-        ? patternElements(pattern, { theme: specialize(theme, target, locale), app: cfg.app?.name, n: group.length, cls: canvasClass(W, H) === 'tablet' ? 'tablet' : 'tall', opts: specialize(cfg.panorama.patternOptions || {}, target, locale),
+        ? patternElements(pattern, { theme: specialize(theme, target, locale), app: cfg.app?.name, n: group.length, W, H, model: target.model, cls: canvasClass(W, H) === 'tablet' ? 'tablet' : 'tall', opts: specialize(cfg.panorama.patternOptions || {}, target, locale),
             screens: group.map((sl) => specialize(sl, target, locale).screen).map((sc, i, a) => sc || a.find(Boolean)) })
         : [];
       (pano ? [...generated, ...(cfg.panorama.elements || [])] : []).forEach((e0, i) => {
