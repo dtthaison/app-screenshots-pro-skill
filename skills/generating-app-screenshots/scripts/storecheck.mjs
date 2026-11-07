@@ -15,13 +15,25 @@ export const CHECKS = {
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const langOf = (locale) => String(locale || 'en').split(/[-_]/)[0].toLowerCase();
-// scripts written without spaces between words: a term matches anywhere in the text
-const NO_BREAKS = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
-// One term as a regex source. Without word breaks the term may sit inside a word, but never right after a digit or a
-// Han numeral ("11月" is not "1月", "十一月" is not "一月"); elsewhere it must stand alone. A space matches any white space.
+// The text the viewer reads: no **highlight** markers, line breaks (real or a literal \n) as spaces, curly apostrophes
+// as straight ones, so "The **best** app", "Tháng\n10" and "Valentine’s Day" are checked like plain text.
+export const plainText = (text) => String(text ?? '').replace(/\*\*/g, '').replace(/\\n|\r?\n/g, ' ').replace(/[\u2018\u2019\u02BC]/g, "'");
+// scripts written without spaces between words: a term matches inside a word
+const NO_BREAKS = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
+const HAN = /\p{Script=Han}/u;
+// One term as a regex source. A space in a term matches any white space.
+// - ja, zh, th: the term may sit inside a word, but never right after a digit or a Han numeral ("11月" is not "1月",
+//   "十一月" is not "一月"). A single kanji before kana ("春の") must also not follow another kanji ("青春の" is youth).
+// - ko: words are spaced but take particles, so a term must start a word and may run on ("10월에"; "돌봄" is not "봄").
+// - elsewhere: the term stands alone.
 function termRe(term) {
   const body = escapeRe(term).replace(/ +/g, '\\s+');
-  return NO_BREAKS.test(term) ? `(?<![\\p{N}〇一二三四五六七八九十])${body}` : `(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`;
+  if (/^\p{Script=Hangul}|^\d+\p{Script=Hangul}/u.test(term)) return `(?<![\\p{L}\\p{N}])${body}`;
+  if (NO_BREAKS.test(term)) {
+    const kanjiWord = HAN.test(term[0]) && term.length > 1 && !HAN.test(term[1]);
+    return `(?<![\\p{N}〇一二三四五六七八九十${kanjiWord ? '\\p{Script=Han}' : ''}])${body}`;
+  }
+  return `(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`;
 }
 // longest first, so "Tháng 10" wins over "Tháng 1" and "die beste app" over a shorter term
 const termsRegex = (terms) => new RegExp([...new Set(terms)].sort((a, b) => b.length - a.length).map(termRe).join('|'), 'iu');
@@ -41,29 +53,33 @@ export function framedDevice(target, dev) {
 
 // price (WARN, Apple preview and creative targets): currency symbols and codes next to digits, and period words
 const SYMBOLS = '$€£¥₩₫฿₹₱₺₽₴₪₦₸';
-const MARK = `(?:\\d|[${SYMBOLS}円元원])`;   // what ends an amount: a digit or a currency mark
-// ISO codes are matched in capitals only, so "Try 7 days" and "php 8" are not prices. TRY and PHP are also an English
-// word and a language name, so they count only after the amount ("50 TRY"), or PHP before at least two digits ("PHP 199").
+// what ends an amount before a "/period": a currency mark, or a decimal amount ("9.99/mo", "99.000/tháng").
+// A whole number alone is a frequency, not a price ("5/week", "3x/week").
+const MARK = `(?:\\d[.,]\\d{2,3}|[${SYMBOLS}円元원đ])`;
+// ISO codes, RM and Rp are matched in capitals only, so "Try 7 days", "php 8" and "Rm 12" are not prices. An amount after a
+// code must not run into a letter ("CAD 3D"). TRY and PHP are also an English word and a language name: TRY counts only
+// after an amount of two or more digits or with decimals ("50 TRY", not "STEP 1 TRY IT"), PHP before two or more digits.
 const CODES = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'KRW', 'VND', 'THB', 'INR', 'MYR', 'IDR', 'AUD', 'CAD', 'CHF', 'BRL', 'MXN',
   'SGD', 'HKD', 'TWD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RUB', 'UAH', 'ZAR', 'NZD', 'AED', 'SAR', 'ILS', 'NGN', 'EGP',
   'PKR', 'TRY', 'PHP'];
 const PREFIX_CODES = CODES.filter((c) => c !== 'TRY' && c !== 'PHP').join('|');
-// period words after "/" in many languages; a period word counts only right after an amount ("3x/week" is not a price)
+// period words after "/" in many languages
 const PERIODS = ['month', 'mo', 'year', 'yr', 'week', 'wk', 'monat', 'jahr', 'woche', 'mois', 'an', 'semaine', 'mes', 'año',
   'semana', 'mês', 'ano', 'mese', 'anno', 'settimana', 'mån', 'år', 'måned', 'mnd', 'mies', 'rok', 'ay', 'yıl', 'maand', 'jaar',
   'tháng', 'năm', 'tuần'];
 const PRICE_CI = new RegExp([
   `[${SYMBOLS}]\\s?\\d`, `\\d\\s?[${SYMBOLS}]`,
-  `(?<![\\p{L}])(?:RM|Rp|R\\$|kr\\.?)\\s?\\d`, `\\d\\s?(?:kr|zł|kč)(?![\\p{L}])`,
+  `(?<![\\p{L}])(?:R\\$|kr\\.?)\\s?\\d`, `\\d\\s?(?:kr|zł|kč|đ)(?![\\p{L}])`,
+  `\\d\\s?(?:円|元|원)`,   // "480円", "6元", "9,900원" (a Korean particle may follow)
   `${MARK}\\s?\\/\\s?(?:${PERIODS.join('|')})(?![\\p{L}])`,
   `${MARK}\\s?\\/\\s?(?:月|年|週|周|월|년|주)`,
 ].join('|'), 'iu');
 const PRICE_CODES = new RegExp([
-  `(?<![\\p{L}])(?:${PREFIX_CODES})\\s?\\d`, `(?<![\\p{L}])PHP\\s?\\d{2,}`,
-  `\\d\\s?(?:${CODES.join('|')}|TL)(?![\\p{L}])`,
+  `(?<![\\p{L}])(?:${PREFIX_CODES}|RM|Rp)\\s?\\d[\\d.,]*(?![\\p{L}\\d])`, `(?<![\\p{L}])PHP\\s?\\d{2,}`,
+  `\\d\\s?(?:${PREFIX_CODES}|PHP|TL)(?![\\p{L}])`, `(?:\\d{2,}|\\d[.,]\\d{2})\\s?TRY(?![\\p{L}])`,
 ].join('|'), 'u');
 export function priceMatch(text) {
-  const s = String(text ?? '');
+  const s = plainText(text);
   const m = PRICE_CI.exec(s) || PRICE_CODES.exec(s);
   if (!m) return null;
   // quote the whole amount ("$9.99", not "$9"): widen the match over the digits and separators around it
@@ -95,7 +111,7 @@ function monthNames(locale) {
   return Array.from({ length: 12 }, (_, m) => fmt.format(new Date(2024, m, 15)));
 }
 export function timeSensitive(text, locale = 'en') {
-  const s = String(text ?? '');
+  const s = plainText(text);
   const year = /(?<!\d)(?:199\d|20\d\d)(?!\d)/.exec(s);
   if (year) return `"${year[0]}" dates the video — avoid years and seasons (apple-seasonal)`;
   const month = cached(`month:${locale}`, () => termsRegex(monthNames(locale))).exec(s);
@@ -125,7 +141,7 @@ const PLAY = {
 const APP_WORDS = 'apps?|games?|tools?|trackers?|planners?|choice';
 const BEST = new RegExp(`(?<![\\p{L}\\p{N}])(?:the\\s+best(?!\\s+of(?![\\p{L}]))(?![\\p{L}\\p{N}])|best(?:\\s+[\\p{L}-]+){0,2}?\\s+(?:${APP_WORDS})(?![\\p{L}\\p{N}]))`, 'iu');
 export function playPhrase(text, locale = 'en') {
-  const s = String(text ?? ''), lang = langOf(locale);
+  const s = plainText(text), lang = langOf(locale);
   const m = cached(`play:${lang}`, () => termsRegex([...PLAY.en, ...(PLAY[lang] ?? [])])).exec(s) || BEST.exec(s);
   return m ? `"${m[0]}" — Google Play asks for no calls to action or superlatives (play-phrases)` : null;
 }
@@ -140,18 +156,19 @@ export function iphoneOnly(target) {
 }
 
 // hook-timing, beat-length, end-card (WARN, previews with a concept) -> [{ check, scene, message }]
-// scene is the scene id the finding is about, or null for the whole preview
+// scene is the scene a scene-level checks.ignore can silence it from: hook-timing belongs to the first caption scene
+// (hookScene), a missing end card to the last scene
 const LONG_OK = new Set(['hero-moment', 'ask-answer']);   // one beat of 5-8 s
 const sec = (d) => `${Math.round(d * 100) / 100}s`;
-export function conceptFindings(conceptId, timeline, { hookVisibleAt = null, endCardIds = [] } = {}) {
+export function conceptFindings(conceptId, timeline, { hookVisibleAt = null, hookScene = null, endCardIds = [] } = {}) {
   const out = [], scenes = timeline?.scenes ?? [];
   const add = (check, scene, message) => out.push({ check, scene, message });
-  if (hookVisibleAt != null && hookVisibleAt > 1 + EPS) add('hook-timing', null, `the first caption is fully visible at ${hookVisibleAt.toFixed(1)}s — it should be by 1.0s`);
+  if (hookVisibleAt != null && hookVisibleAt > 1 + EPS) add('hook-timing', hookScene, `the first caption is fully visible at ${hookVisibleAt.toFixed(1)}s — it should be by 1.0s`);
   const ends = new Set(endCardIds);
   // the end card comes last; without one the last scene is not judged as a beat
   let beatScenes = scenes;
   if (!ends.size && scenes.length) {
-    add('end-card', null, `concept "${conceptId}": no end card — the last scene should use layout end-card`);
+    add('end-card', scenes.at(-1).id, `concept "${conceptId}": no end card — the last scene should use layout end-card`);
     beatScenes = scenes.slice(0, -1);
   }
   const allowLong = LONG_OK.has(conceptId) && CONCEPTS.some((c) => c.id === conceptId);
@@ -190,7 +207,7 @@ export function storeChecks({ target, locale, preview, scenes, timeline, disclos
   const ignoreOf = (list, where) => {
     const set = new Set();
     for (const name of [list ?? []].flat()) {
-      if (!(name in CHECKS)) add('checks', null, `${where}checks.ignore: unknown check "${name}" — known: ${Object.keys(CHECKS).join(', ')}`);
+      if (!Object.hasOwn(CHECKS, name)) add('checks', null, `${where}checks.ignore: unknown check "${name}" — known: ${Object.keys(CHECKS).join(', ')}`);
       else if (CHECKS[name] === 'ERROR') add('checks', null, `${where}checks.ignore: "${name}" is an ERROR and cannot be ignored`);
       else set.add(name);
     }
@@ -225,17 +242,19 @@ export function storeChecks({ target, locale, preview, scenes, timeline, disclos
     // the entrance starts with the transition into the scene; restLen covers its delay and the caption motion
     const hookVisibleAt = f ? Math.max(f.start, f.start - (f.transition?.dur ?? 0) + restLen(f)) : null;
     const endCardIds = scenes.filter((s) => s.layout === 'end-card').map((s) => s.id);
-    for (const c of conceptFindings(preview.concept, timeline, { hookVisibleAt, endCardIds })) add(c.check, c.scene, c.message);
-    if (disclose && !endCardIds.length) add('disclose', null, `owner.disclose is set ("${disclose}") but the preview has no end-card scene — show it in the footage or add an end card (apple-disclose)`);
+    for (const c of conceptFindings(preview.concept, timeline, { hookVisibleAt, hookScene: scenes[first]?.id ?? null, endCardIds })) add(c.check, c.scene, c.message);
+    // disclose belongs to the last scene, where the end card would go
+    if (disclose && !endCardIds.length) add('disclose', scenes.at(-1)?.id ?? null, `owner.disclose is set ("${disclose}") but the preview has no end-card scene — show it in the footage or add an end card (apple-disclose)`);
   }
 
   const kept = findings.filter((f) => f.level === 'ERROR' || f.check === 'checks'
     || !(previewIgnore.has(f.check) || (f.scene != null && sceneIgnore.get(f.scene)?.has(f.check))));
   for (const f of kept) if (!f.level) f.level = 'WARN';   // ignore-list problems
-  // printable lines keep the 1.2.0 shape: 'scene "<id>": <message>' for scene findings, the concept ones prefixed by their check
+  // printable lines keep the 1.2.0 shape: 'scene "<id>": <message>' for text and timing findings; the concept checks as
+  // '<check>: <message>' (their message names the scene where it matters) and disclose as its message alone
   const line = (f) => {
-    const concept = ['hook-timing', 'beat-length', 'end-card'].includes(f.check) ? `${f.check}: ${f.message}` : f.message;
-    return f.scene != null && !concept.startsWith(`${f.check}: scene "`) ? `scene "${f.scene}": ${concept}` : concept;
+    if (['hook-timing', 'beat-length', 'end-card'].includes(f.check)) return `${f.check}: ${f.message}`;
+    return f.scene != null && f.check !== 'disclose' ? `scene "${f.scene}": ${f.message}` : f.message;
   };
   const pick = (level) => kept.filter((f) => f.level === level).map(line);
   return { findings: kept, warnings: pick('WARN'), notes: pick('NOTE'), errors: pick('ERROR') };

@@ -8,6 +8,10 @@
   - `play-phrases` knows calls to action and rank claims in de, fr, es, pt, it, vi, ja, zh and ko, plus "No. 1", "number one" and "top-rated". A bare "best" is flagged only as "the best …" or "best <app word>", so "Be your best self" no longer warns; "the best of" passes (Play's "Best of" awards are allowed).
   - `price` knows more currencies (`kr`, `zł`, `Kč`, `₺ ₽ ₴ ₪ ₦ ₸`, more ISO codes) and period words (`/Jahr`, `/an`, `/año`, `/mês`, `/năm`, `/월` …). ISO codes match in capitals only, and `TRY` / `PHP` only where they cannot be a word ("Try 7 days", "PHP 8" pass). The message quotes the whole amount (`"$9.99"`, was `"$9"`).
   - `checks.ignore` on a preview or a scene switches off WARN and NOTE checks by name; unknown names are a WARN and ERROR checks cannot be ignored.
+  - Text checks read the caption as the viewer sees it, without `**highlight**` markers, so "The **best** app" and "**Black** Friday" are caught.
+  - `price` also catches amounts followed by `円`, `元`, `원` or `đ` ("480円", "9,900원"). Fewer false positives: a whole number before a period word is a frequency ("5/week" passes; "9.99/mo" and "$5/week" still warn), and "CAD 3D", "Rm 12" and "STEP 1 TRY IT" pass.
+  - Korean season words must start a word ("돌봄", care, is not "봄"); "青春の" is not a season; curly apostrophes match ("Valentine’s Day").
+  - A scene-level `checks.ignore` also silences `hook-timing` (first caption scene), a missing end card and `disclose` (last scene).
   - `storeChecks` also returns `findings: [{ check, level, scene, message }]` and includes the `iphone-only` ERROR; beat lengths print rounded (`2.2s`, not `2.2000000000000002s`). Month, season and phrase regexes are compiled once per locale.
 
 ## 1.2.0 (2026-10-31)
