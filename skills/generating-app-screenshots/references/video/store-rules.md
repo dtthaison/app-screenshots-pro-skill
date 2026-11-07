@@ -78,8 +78,12 @@ research notes read them.
 These names are implemented by `scripts/storecheck.mjs`. Levels never change the exit code: WARN and NOTE exit 0, ERROR
 exits 1.
 
+Text checks read the caption as the viewer sees it: `**highlight**` markers removed, line breaks as spaces, curly
+apostrophes as straight ones.
+
 A WARN or NOTE check can be switched off with `"checks": { "ignore": ["time-sensitive"] }` on a preview (every scene)
-or on one scene. Unknown names are a WARN; ERROR checks cannot be ignored. `storeChecks` also returns each result as
+or on one scene. `hook-timing` belongs to the first scene with a caption; a missing end card and `disclose` belong to
+the last scene. Unknown names are a WARN; ERROR checks cannot be ignored. `storeChecks` also returns each result as
 `{ check, level, scene, message }` (`findings`) beside the printed lines.
 
 ## framed-device
@@ -88,11 +92,12 @@ WARN on `preview-*` targets. A device model other than `none`, or a style other 
 
 ## price
 WARN on Apple preview and creative targets. Matches a currency symbol next to a digit (`$ € £ ¥ ₩ ₫ ฿ ₹ ₱ ₺ ₽ ₴ ₪ ₦ ₸`,
-`RM`, `Rp`, `R$`, `kr`, `zł`, `Kč`), ISO codes in capitals before or after digits (`TRY` and `PHP` only after the amount,
-or `PHP` before two or more digits, so "Try 7 days" and "PHP 8" pass), and period words after an amount (`/month`,
-`/mo`, `/year`, `/yr`, `/week`, `/Monat`, `/Jahr`, `/mois`, `/an`, `/mes`, `/año`, `/mês`, `/mese`, `/mån`, `/år`,
-`/tháng`, `/năm`, `/月`, `/年`, `/週`, `/월`, `/년` and more). The message quotes the whole amount. Works in every locale.
-Rows: `apple-prices`.
+`R$`, `kr`, `zł`, `Kč`, `đ`), a digit followed by `円`, `元` or `원` ("480円", "9,900원"), and ISO codes, `RM` and `Rp`
+in capitals before or after an amount ("CAD 3D", "Rm 12" and "PHP 8" pass; `TRY` counts only after two or more digits
+or a decimal amount, so "STEP 1 TRY IT" passes). A period word (`/month`, `/mo`, `/year`, `/yr`, `/week`, `/Monat`,
+`/Jahr`, `/mois`, `/an`, `/mes`, `/año`, `/mês`, `/mese`, `/mån`, `/år`, `/tháng`, `/năm`, `/月`, `/年`, `/週`, `/월`,
+`/년` and more) counts after a currency mark or a decimal amount ("9.99/mo"); after a whole number it is a frequency
+("5/week"). The message quotes the whole amount. Rows: `apple-prices`.
 
 ## play-phrases
 WARN on `play-promo`. Matches calls to action and rank claims in English and in the locale's language (de, fr, es, pt,
@@ -105,8 +110,9 @@ because Play's "Best of" awards are allowed. "Free" is not matched: the video ru
 ## time-sensitive
 NOTE on all video targets. A 4-digit year from 1990 to 2099, a month name in the locale, or a season or holiday word
 in English or the locale's language (summer, Christmas, Black Friday, Weihnachten, Noël, Tết, mùa hè, クリスマス, 春节,
-여름 …). In scripts without spaces (ja, zh, ko, th) a name matches inside a word but never after a digit, so "11月" is
-reported as "11月", not "1月". Month names come from `Intl` in the nominative, so inflected forms such as Russian
+여름 …). In ja, zh and th a name matches inside a word but never after a digit, so "11月" is reported as "11月", not
+"1月", and a lone kanji season ("春の") never after another kanji ("青春の" is youth). In Korean a name must start a word
+but may take a particle ("10월에"), so "돌봄" (care) is not "봄". Month names come from `Intl` in the nominative, so inflected forms such as Russian
 "в октябре" are missed. Rows: `apple-seasonal`, `play-time-sensitive`.
 
 ## reading-time

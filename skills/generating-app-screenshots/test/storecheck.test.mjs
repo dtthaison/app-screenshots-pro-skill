@@ -4,8 +4,8 @@ import { isStillImagePath, framedDevice, priceMatch, timeSensitive, playPhrase, 
 import { buildTimeline } from '../scripts/video.mjs';
 
 test('price patterns across locales', () => {
-  for (const s of ['Just $9.99', '9,99 €/Monat', '¥1,000', '99.000₫/tháng', '月額500円/月', 'RM 12', 'Rp15.000', 'R$ 9', '9 USD', 'EUR 5', '$5/yr', '4 € /mois', '每月 ¥9/年', '500円/月', '9 /week']) assert.ok(priceMatch(s), s);
-  for (const s of ['Swap in one tap', '12/25 sets', '3 workouts', 'Train 5 days a week', 'Do more', '1/more', '3x/week', '5 days/week', 'Train 3 times a week', 'Cardio/year-round']) assert.equal(priceMatch(s), null, s);
+  for (const s of ['Just $9.99', '9,99 €/Monat', '¥1,000', '99.000₫/tháng', '月額500円/月', 'RM 12', 'Rp15.000', 'R$ 9', '9 USD', 'EUR 5', '$5/yr', '4 € /mois', '每月 ¥9/年', '500円/月', '9.99 /week']) assert.ok(priceMatch(s), s);
+  for (const s of ['Swap in one tap', '12/25 sets', '3 workouts', 'Train 5 days a week', 'Do more', '1/more', '3x/week', '5 days/week', 'Track 5/week', 'Train 3 times a week', 'Cardio/year-round']) assert.equal(priceMatch(s), null, s);
 });
 test('time-sensitive: year and localized month names', () => {
   assert.ok(timeSensitive('New for 2026', 'en-US')); assert.ok(timeSensitive('Neu im Oktober', 'de'));
@@ -140,4 +140,35 @@ test('two end cards: the first is not last; beat lengths print rounded', () => {
   const w = conceptWarnings('feature-loop', tl(['a', 2.2000000000000002], ['e1', 2], ['b', 3], ['e2', 2]), { endCardIds: ['e1', 'e2'] });
   assert.deepEqual(w, ['end-card: scene "e1" is not the last scene']);
   assert.match(conceptWarnings('feature-loop', tl(['a', 1.2345], ['e', 2]), { endCardIds: ['e'] })[0], /lasts 1\.23s/);
+});
+
+test('highlight markers and line breaks do not hide a match', () => {
+  for (const s of ['The **best** app for runners', '**Best** fitness app', 'Get the **best** sleep', 'Download **now**']) assert.ok(playPhrase(s), s);
+  assert.ok(playPhrase('**Tải** ngay', 'vi'));
+  assert.ok(timeSensitive('**Black** Friday', 'en')); assert.ok(timeSensitive('Tháng **10**', 'vi')); assert.ok(timeSensitive('Black\\nFriday', 'en'));
+  assert.match(priceMatch('Only **$9.99**'), /"\$9\.99"/);
+});
+test('prices with the currency after the amount; fewer false positives', () => {
+  for (const s of ['月額480円', '480円', '월 9,900원', '每月6元', '99.000đ', '9.99/mo', '4,99/Monat', 'RM 12', 'Rp 15.000']) assert.ok(priceMatch(s), s);
+  for (const s of ['Run 5k 3/week', 'STEP 1 TRY IT FREE', 'LEVEL 2 TRY AGAIN', 'Design in CAD 3D', 'Rm 12 booked']) assert.equal(priceMatch(s), null, s);
+});
+test('time-sensitive: Korean words start a term, a lone kanji season needs no kanji before it, curly apostrophes', () => {
+  for (const [s, l] of [['아이 돌봄 앱', 'ko'], ['반려동물 돌봄', 'ko'], ['살펴봄', 'ko'], ['青春の記録', 'ja']]) assert.equal(timeSensitive(s, l), null, s);
+  for (const [s, l] of [['봄 세일', 'ko'], ['여름에 만나요', 'ko'], ['この春の新機能', 'ja'], ['Happy Valentine’s Day', 'en'], ['Profitez de l’été', 'fr']]) assert.ok(timeSensitive(s, l), s);
+});
+test('scene-level ignore reaches hook-timing (first caption scene), a missing end card and disclose (last scene)', () => {
+  const timeline = { scenes: [{ id: 'a', start: 0, end: 4, duration: 4, words: 8, captionMotion: 'words', entrance: 'fade', transition: { kind: 'cut', dur: 0 }, labels: [] },
+    { id: 'b', start: 4, end: 7, duration: 3, words: 1, captionMotion: 'rise', entrance: 'rise', transition: { kind: 'cut', dur: 0 }, labels: [] }] };
+  const run = (ignA, ignB) => storeChecks({ target: { id: 'preview-iphone', store: 'ios' }, locale: 'en', preview: { concept: 'feature-loop' }, timeline, disclose: 'Subscription required',
+    scenes: [{ id: 'a', layout: 'caption-band', dev: frameless, texts: [], hasCaption: true, ignore: ignA }, { id: 'b', layout: 'caption-band', dev: frameless, texts: [], hasCaption: true, ignore: ignB }] });
+  const all = run();
+  assert.deepEqual(all.findings.map((f) => [f.check, f.scene]), [['hook-timing', 'a'], ['end-card', 'b'], ['disclose', 'b']]);
+  assert.ok(all.warnings.includes('end-card: concept "feature-loop": no end card — the last scene should use layout end-card'));
+  assert.ok(all.notes[0].startsWith('owner.disclose is set'));
+  assert.deepEqual(run(['hook-timing'], ['end-card', 'disclose']).findings, []);
+  assert.equal(run(['end-card']).findings.length, 3);   // the missing end card is the last scene's, not scene a's
+});
+test('checks.ignore: inherited property names are unknown checks', () => {
+  const r = storeChecks(oneScene([], { preview: { checks: { ignore: ['constructor', 'toString'] } } }));
+  assert.equal(r.warnings.filter((w) => /unknown check/.test(w)).length, 2);
 });
