@@ -15,6 +15,7 @@ Paths are relative to the config file. Coordinates for every element:
   "app": { "name": "Streakly" },
   "defaultLocale": "en-US",                 // fallback for missing strings and screens
   // Locale lookup: exact code, then its language ("en-US" finds strings stored under "en", e.g. an .xcstrings sourceLanguage).
+  // A missing string or inline { "en": ... } value falls back to defaultLocale, looked up the same way (code, then language).
   // Use region codes where the store wants them (en-US, pt-BR, es-MX); plain language codes (fr, de, ja) are fine otherwise.
   "locales": ["en-US", "vi", "de", "ar", "ja"],
   "targets": ["ios-6.9", "ipad-13", "android-phone", "play-feature-graphic"],
@@ -560,7 +561,7 @@ Screens may carry a query (`screens/stats.html?state=before`) that the HTML mock
 Exit code 0 = clean; 1 = validation errors (wrong size, alpha, too many files, overflowing text, missing screen/string, duration out of range); 2 = crash.
 Outputs: `out/<target>/<locale>/NN_<id>.png`, `out/_preview/*.jpg` contact sheets (rows of 6, for QA),
 `out/index.html` (full-resolution gallery with slide + layout labels), `out/manifest.json`,
-and with `--fastlane`: `out/fastlane/screenshots/<asc-locale>/` + `out/fastlane/metadata/android/<play-locale>/images/...`.
+and with `--fastlane`: `out/fastlane/screenshots/<asc-locale>/` + `out/fastlane/metadata/android/<play-locale>/images/...` (files keep their real extension, `.jpeg` with `--format jpeg`).
 Previews add `out/<target>/<locale>/NN_<id>.mp4` and `NN_<id>.poster.png`; a filmstrip `out/_preview/<target>__<locale>__<id>.jpg` (one frame per second, numbered; read it); and in `index.html` a `<video>` per file. With `--fastlane`: `out/fastlane/app-previews/<asc-locale>/NN_<IDENT>_<id>.mp4` (for example `01_IPHONE_67_tour.mp4`), which `fastlane deliver` uploads (identifiers `IPHONE_67`, `IPHONE_55`, `IPHONE_47`, `IPAD_PRO_3GEN_129`, `IPAD_97`, `DESKTOP`); creative files (images and videos) go to `out/fastlane/creative/<asc-locale>/<baseId>_<slide-or-preview-id>.<ext>` (for example `app-header_header.png`, `header-video_tour.mp4`) and are uploaded by hand in App Store Connect. A preview with an ERROR (duration, count, size) is not copied and not listed in `manifest.json`.
 A filtered run (`--targets`, `--previews`, `--scenes`, `--slides`) rewrites `manifest.json` and `index.html` with only that run's output.
 Render time: about 1–2 minutes per preview per locale on a laptop, 3–5 minutes for a 4K creative video.

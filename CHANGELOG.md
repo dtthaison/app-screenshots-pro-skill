@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `render.mjs` fixes (helpers in `scripts/refs.mjs`):
+  - Two HTML mocks with the same file name in different folders (`screens/one/index.html`, `screens/two/index.html`) shared one rendered PNG, so both slides showed the second mock. The output name now carries a short hash of the source path.
+  - A string or inline `{ "en": … }` value missing for a locale now falls back to `defaultLocale` and then its language. Before, `defaultLocale: "en-US"` with strings under `en` gave `string key not found` for every other locale, and inline values returned nothing (the title vanished).
+  - A project path with an apostrophe or parentheses (`~/Son's Apps/`) left background images and zoom cards black: `'`, `(` and `)` are now percent-encoded in file URLs used inside CSS `url('…')`.
+  - `--fastlane` with `--format jpeg` copied JPEG bytes to `.png` names; iOS screenshots, Play screenshots, the feature graphic and the TV banner keep the rendered file's extension (deliver and supply accept `.jpg`, `.jpeg` and `.png`).
+  - Image metadata (aspect) is now read for `screen3` and every entry of `screens` (mosaic), also for zoom sources of `popouts`, `lens` and `layers`, in stills and previews. Before, `device3` of `three-devices` and `deck` and mosaic tiles got the target's frame instead of the one `model: "auto"` picks, so a 16:9 image was cropped in a phone frame next to a tablet frame.
 - Store-rule checks (`scripts/storecheck.mjs`, `references/video/store-rules.md#enforcing-checks`):
   - `time-sensitive` also flags season and holiday words in English and the locale's language (summer, Christmas, Black Friday, Weihnachten, Noël, Tết, mùa hè, クリスマス, 春节, 여름 …). Before, the message said "avoid seasons" but only years and months were checked.
   - Months in scripts without spaces: "11月" was reported as "1月" and "十一月" as "一月"; Korean ("10월에") and Thai month names were missed. Now each is found and named correctly.
